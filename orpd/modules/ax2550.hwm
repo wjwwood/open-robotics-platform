@@ -1,0 +1,138 @@
+"""
+This is a hardware module to control the ax2550 motor controller.
+
+This line starts the long description of your HW module, 
+and can go on for as long as you need.
+
+Also, it can have several different paragraphs and it also
+supports HTML.
+
+You should list any information about your HW module here.
+"""
+
+# Import some useful libraries
+import thread
+
+class AX2550(Device):
+    """This class allows you to control an ax2550 motor controller"""
+    def init(self):
+        """Function called after object instantiation"""
+        from serial import Serial
+        from threading import Lock
+        # Get the serial port name
+        try:
+            self.serial_port = self.config['serial']
+        except AttributeError as err:
+            error('%s is missing a configuration.' % self.name)
+            raise err
+        # Try to open and configure the serial port
+        try:
+            self.serial = Serial(self.serial_port)
+            self.serial.timeout = 1
+            self.serial.baud = "9600"
+            self.serial.bytesize = 7
+            self.serial.parity = "E"
+            self.serial.stopbits = 1
+            self.serial.close()
+            self.serial.open()
+            self.serial.write('\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n')
+        except Exception as err:
+            error('Error opening/configuring the serial port for %s' % self.name)
+            raise err
+        # Setup the lock to synchronize the setting of motor speeds
+        self.speed_lock = Lock()
+        self.serial_lock = Lock()
+        # Set the motor speed to zero and start the dead man switch counter measure
+        self.left_speed = 0
+        self.right_speed = 0
+        self.running = True
+        thread.start_new_thread(self.keepAlive, ())
+        
+    def keepAlive(self):
+        """This functions sends the latest motor speed to prevent the dead man 
+            system from stopping the motors
+        """
+        try:
+            from time import sleep
+            while self.running:
+                sleep(0.5)
+                # Lock the speed lock
+                self.speed_lock.acquire()
+                # Resend the current motor speeds
+                self.__setSpeed(self.left_speed, self.right_speed)
+                # Release the speed lock
+                self.speed_lock.release()
+        except Exception as err:
+            error(str(err))
+            
+    @expose
+    def move(self, speed=0.0, direction=0.0):
+        """Adjusts the motors based on the speed and direction you specify.
+            
+        Speed and Direction should be values between -1.0 and 1.0, inclusively."""
+        #Validate the parameters
+        if speed < -1.0 or speed > 1.0:
+            error("Speed given to the move() function must be between -1.0 and 1.0 inclusively.")
+            return
+        if direction < -1.0 or direction > 1.0:
+            error("Direction given to the move() function must be between -1.0 and 1.0 inclusively.")
+            return
+        #First calculate the speed of each motor then send the commands
+        #Account for speed
+        left_speed = speed
+        right_speed = speed
+        #Account for direction
+        left_speed = right_speed + direction
+        right_speed = right_speed - direction
+        #Account for going over 1.0 or under -1.0
+        if left_speed < -1.0:
+            left_speed = -1.0
+        if left_speed > 1.0:
+            left_speed = 1.0
+        if right_speed < -1.0:
+            right_speed = -1.0
+        if right_speed > 1.0:
+            right_speed = 1.0
+        #Send the commands
+        self.setSpeeds(left=left_speed, right=right_speed)
+    
+    def setSpeeds(self, left=None, right=None):
+        """Sets the speed of both motors"""
+        # Lock the speed lock
+        self.speed_lock.acquire()
+        # Resend the current motor speeds
+        if left != None:
+            self.left_speed = left
+        if right != None:
+            self.right_speed = right
+        self.__setSpeed(self.left_speed, self.right_speed)
+        # Release the speed lock
+        self.speed_lock.release()
+    
+    def __setSpeed(self, left, right):
+        """Actually sends the appriate message to the motor"""
+        # Form the commands
+        #Left command
+        left_command = "!"
+        if left < 0:
+            left_command += "A"
+        else:
+            left_command += "a"
+        left = int(abs(left)*127)
+        left_command += "%02X" % left
+        #Right command
+        right_command = "!"
+        if right < 0:
+            right_command += "B"
+        else:
+            right_command += "b"
+        right = int(abs(right)*127)
+        right_command += "%02X" % right
+        # Lock the serial lock
+        self.serial_lock.acquire()
+        # Send the commands
+        self.serial.write(left_command+'\r')
+        self.serial.write(right_command+'\r')
+        # Release the serial lock
+        self.serial_lock.release()
+        

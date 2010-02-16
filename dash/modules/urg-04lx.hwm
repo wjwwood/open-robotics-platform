@@ -1,0 +1,76 @@
+"""
+This is a hardware module to control the URG-04LX Laser Range Finder.
+
+This line starts the long description of your HW module, 
+and can go on for as long as you need.
+
+Also, it can have several different paragraphs and it also
+supports HTML.
+
+You should list any information about your HW module here.
+"""
+
+# Import some useful libraries
+from serial import Serial
+from threading import Lock
+
+class URG_04LX(Device):
+    """This class allows you to control a URG-04LX Laser Range Finder"""
+    def init(self):
+        """Function called after object instantiation"""
+        # Get the serial port name
+        try:
+            config = self.config
+            self.serial_port = config['serial']
+            self.baud_rate = config['baud_rate']
+            self.start = config['start']
+            self.stop = config['stop']
+            self.step = config['step']
+        except AttributeError as err:
+            error('%s is missing a configuration.' % self.name)
+            raise err
+        # Try to open and configure the serial port
+        try:
+            self.serial = Serial()
+            self.serial.port = self.serial_port
+            self.serial.timeout = 1
+            self.serial.baud = self.baud_rate
+            self.serial.open()
+        except Exception as err:
+            error('Error opening/configuring the serial port for %s' % self.name)
+            raise err
+        # More Setup
+    
+    @expose
+    def scan(self):
+        """This function causes the lrf to scan and converts the result to cm"""
+        start = self.start
+        stop = self.stop
+        step = self.step
+        result = []
+        # Generate the command
+        command = 'G'+start+stop+step+'\r'
+        
+        # Send the command
+        self.serial.write(command)
+        
+        # Retrieve data
+        # Burn the first two lines.
+        self.serial.readline()
+        self.serial.readline()
+        
+        line = self.serial.readline()
+        # While there is no empty line return, ('\n'), continue processing data
+        while (line != '\n'):
+            # While we haven't reached the end of the line
+            i = 0
+            while (line[i] != '\n'):
+                dist = (ord(line[i]) - 48) << 6
+                i += 1
+                dist += ord(line[i]) - 48
+                i += 1
+                result.append(dist)
+            line = self.serial.readline()
+        # Return the resulting list of distances
+        return result
+    

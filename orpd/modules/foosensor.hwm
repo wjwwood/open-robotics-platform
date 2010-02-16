@@ -1,0 +1,32 @@
+"""
+This line is the short description of your HW module.
+
+This line starts the long description of your HW module, 
+and can go on for as long as you need.
+
+Also, it can have several different paragraphs and it also
+supports HTML.
+
+You should list any information about your HW module here.
+"""
+
+class FooSensor(Device):
+    """This sensor is an example sensor for testing hwm"""
+    def init(self):
+        """Function called after object instantiation"""
+        info('FooSensor init called')
+    
+    def getServices(self):
+        info('FooSensor getServices called')
+        return [['foolib', 'foo_func', (1, 2), { 'a' : 'b'}], ['foolib', 'foo_func', (1, 2)], ['foolib', 'foo_func']]
+
+    def shutdown(self):
+        info('shutdown')
+
+    def stop(self):
+        info('stop')
+
+    @expose
+    def bar(self):
+        """generic bar function, returns some data"""
+        return [1,2,3,4,5,6,7,8]

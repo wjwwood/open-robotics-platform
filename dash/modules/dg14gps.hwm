@@ -1,0 +1,193 @@
+# This program will test the GPS unit, and retrieve
+# usable dats.  This data will be latitude, longitude
+# and altitude
+
+import serial
+
+class DG14GPS(Device):
+    """This class allows control of the dg14 GPS unit"""
+    def init(self):
+        """This is the initializer function"""
+        # Get the serial port name
+        try:
+            config = self.config
+            self.serial_port = config['serial']
+            self.baud_rate = config['baud_rate']
+        except AttributeError as err:
+            error('%s is missing a configuration.' % self.name)
+            raise err
+        # Try to open and configure the serial port
+        try:
+            self.serial = serial.Serial()
+            self.serial.port = self.serial_port
+            self.serial.timeout = 5
+            self.serial.baud = self.baud_rate
+            self.serial.stopbits = serial.STOPBITS_ONE
+            self.serial.parity = serial.PARITY_NONE
+            self.serial.close()
+            self.serial.open()
+        except Exception as err:
+            error('Error opening/configuring the serial port for %s' % self.name)
+            raise err
+            
+        #GPS Parameters
+        self.time = None
+        self.longitude = None
+        self.latitude = None
+        self.altitude = None
+        self.satseen = None
+        self.speed = None
+        self.heading = None
+        self.pdop = None
+        self.hdop = None
+        self.vdop = None
+        self.tdop = None
+        self.checksum = None
+        self.satlock = None
+        self.satellites = []
+        
+        # Write init command 2
+        temp = None
+        self.serial.write('$PASHQ,PRT*21\r\n')
+        temp = self.serial.readline()
+        if '$PASHR,PRT,A,5*56' not in temp:
+            raise Exception("GPS is nonresponsive: %s" % temp)
+        self.serial.write('$PASHQ,RID*28\r\n')
+        temp = self.serial.readline()
+        if '$PASHR,RID,DG,DD04,TOPUB_LE_C__YXDR___I*17' not in temp:
+            raise Exception("GPS is nonresponsive: %s" % temp)
+        else:
+            info("GPS is responsive")
+
+    
+    @expose
+    def queryPos(self):
+        """tells the gps unit to send its location"""
+        posdata = None
+        try:
+            self.serial.write('$PASHQ,POS\r\n')
+            posdata = self.serial.readline()
+            if posdata == '':
+                posdata = 'nada'
+        except: 
+            pass
+        if posdata != None:
+            parsed_data = self.parseData(posdata)
+            return posdata
+    
+    @expose
+    def querySat(self):
+        """Queries the SAT message"""
+        satdata = None
+        try:
+            self.serial.write('$PASHQ,SAT/r/n')
+            satdata = self.serial.readline()
+            if satdata == '':
+                satdata = 'nada'
+        except:
+            pass
+        if satdata != None:
+            parsed_sat = self.parseSat(satdata)
+            return satdata
+
+    def parseSat(self, data):
+        """Splits the string of SAT from querySat"""
+        satarray = data.split(',')
+        self.satlock = satarray[2]
+        self.satellites = []
+        for x in range(self.satlock):
+            temp_sat = object()
+            temp_sat.PRN = satarray[2 + x * 5 + 1]
+            temp_sat.azimuth = satarray[2 + x * 5 + 2]
+            temp_sat.elevation = satarray[2 + x * 5 + 3]
+            temp_sat.signaltonoise = satarray[2 + x * 5 + 4]
+            temp_sat.used = satarray[2 + x * 5 + 5]        
+            self.satellites.append(temp_sat)
+        return satarray
+    
+    def parseData(self, data): 
+        """Splits the sting of position from queryPos"""
+        posarray = data.split(',')
+        self.satseen = posarray[3]
+        self.time = posarray[4]
+        self.latitude = posarray[5]
+        self.longitude = posarray[7]
+        self.altitude = posarray[9]
+        self.heading = posarray[11]
+        self.speed = posarray[12]
+        self.pdop = posarray[14]
+        self.hdop = posarray[15]
+        self.vdop = posarray[16]
+        self.tdop = posarray[17]
+        self.checksum = posarray[18]
+        return posarray
+
+    @expose
+    def getTime(self):
+        """Returns the Time"""
+        return self.time
+
+    @expose
+    def getLatitude(self):
+        """Returns the Latitude"""
+        return self.latitude
+
+    @expose
+    def getLongitude(self):
+        """Returns the Longitude"""
+        return self.longitude
+        
+    @expose
+    def getAltitude(self):
+        """Returns the Altitude"""
+        return self.altitude
+    
+    @expose
+    def getSatseen(self):
+        """Returns the number of Satellites"""
+        return self.satseen
+
+    @expose
+    def getSpeed(self):
+        """Returns the speed over ground"""
+        return self.speed
+        
+    @expose
+    def getHeading(self):
+    	"""Returns the Course over Ground"""
+    	return self.heading
+
+    @expose
+    def getPDOP(self):
+        """Returns the PDOP"""
+        return self.pdop
+
+    @expose
+    def getHDOP(self):
+        """Returns the HDOP"""
+        return self.hdop
+
+    @expose
+    def getVDOP(self):
+        """Returns the VDOP"""
+        return self.vdop
+
+    @expose
+    def getTDOP(self):
+        """Returns the TDOP"""
+        return self.tdop
+
+    @expose
+    def getChecksum(self):
+        """Returns the Checksum"""
+        return self.checksum
+
+    @expose
+    def getSatellites(self):
+        """Returns data about satellites that are locked by the GPS"""
+        return self.satellites
+
+    @expose
+    def getSatlock(self):
+        """Returns the number of Satellites Locked"""
+        return self.satlock
