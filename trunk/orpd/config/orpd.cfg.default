@@ -1,0 +1,38 @@
+# This is the config file for the robot daemon
+
+# This is the port that the daemon will listen on for remote connections
+port: 7003
+# This enables/disables the hardware initialization
+hardware_enabled: True
+
+Devices:
+    foosensor1:
+        name: 'foo'
+        enabled: True
+        module: 'foosensor'
+        serial: '/dev/ttyS0'
+        baud_rate: 115200
+        option1: 'asdf'
+        option2: 5000
+    foosensor2:
+        name: 'bar'
+        enabled: True
+        module: 'foosensor'
+        serial: '/dev/ttyS1'
+        baud_rate: 115200
+        option1: 'qwerty'
+        option2: 4000
+    motorcontroller:
+        name: 'mc'
+        enabled: False
+        module: 'ax2550'
+        serial: '/dev/tty.usbserial'
+    laserrangefinder:
+        name: 'lrf'
+        enabled: False
+        module: 'urg-04lx'
+        serial: '/dev/tty.usbmodem1a21'
+        baud_rate: '115200'
+        start: '000'
+        stop: '768'
+        step: '00'
