@@ -81,12 +81,11 @@ class Proxy(object):
 class EventRetriever(threading.Thread):
     """A thread that simply gets the events from the shared queue and 
     formats them a bit. It's simply a producer thread."""
-    def __init__ (self, running, queue, callbacks, log, lock, mleq):
+    def __init__ (self, running, queue, log, lock, mleq):
         ""
         threading.Thread.__init__(self)
         self.running = running
         self.queue = queue
-        self.callbacks = callbacks
         self.log = log
         self.lock = lock
         self.mleq = mleq
@@ -96,7 +95,7 @@ class EventRetriever(threading.Thread):
         while self.running.value:
             evt = self.queue.get(1)
             with self.lock:
-                self.mleq.addEvent(Event(evt[0], vt[1], evt[2], self.callbacks, self.log))
+                self.mleq.addEvent(Event(evt[0], vt[1], evt[2]))
 
 class Sandbox(object):
     """Contains functions and data common to the sandbox"""
@@ -109,8 +108,8 @@ class Sandbox(object):
         self.server = None
         self.queue = None
         self.evt_handler = None
-        self.mleq = MultiLevelEventQueue()
         self.lock = threading.Lock()
+        self.mleq = None
 
     def __go(self, file_name, glbls, lcls):
         """Function to facilitate execution of control code"""
@@ -190,9 +189,10 @@ critical = log.critical
         local_vars = locals()
         global_vars = self.extractLocals(globals(), self.orpd_server.listFunctions())
         global_vars['log'] = log
-        global_vars['registerCallback'] = self.registerCallback
+        global_vars['registerCallback'] = self.mleq.registerCallback
+        global_vars['setPriority'] = self.mleq.setPriority
         global_vars['handleEvents'] = self.handleEvents
-        global_vars['triggerEvent'] = self.triggerEvent
+        global_vars['triggerEvent'] = self.mleq.triggerEvent
         global_vars['stop'] = self.stopControlCode
         log.info('Starting Control Code Execution')
         threading.settrace(tracer)
@@ -231,7 +231,7 @@ critical = log.critical
     def handleEvents(self):
         """Handles Events"""
         try:
-            self.evt_handler = EventRetriever(self.running, self.queue, self.callbacks, self.log, self.lock, self.mleq)
+            self.evt_handler = EventRetriever(self.running, self.queue, self.log, self.lock, self.mleq)
             self.evt_handler.start()
             while self.running.value:
                 with self.lock:
@@ -268,6 +268,8 @@ critical = log.critical
         self.queue = queue
         self.running = running
         self.running.value = True
+        
+        self.mleq = MultiLevelEventQueue(queue, lock)
 
         # Register the kill function
         signal.signal(signal.SIGINT, signalShutdown)
