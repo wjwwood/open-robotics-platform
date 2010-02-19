@@ -51,6 +51,9 @@ import re
 from threading import Timer
 from event_system import Event, MultiLevelEventQueue
 
+# ORP Libs
+from lib import importspecial
+
 ###  Functions  ###
 def signalShutdown(signal, frame):
     """Handles the SIGINT signal, shutting everything down"""
@@ -67,7 +70,6 @@ def tracer(frame, event, args):
 def logError(exc_info, log_func, msg, line_no_delta=0):
     """Logs an error with a traceback"""
     exceptionType, exceptionValue, exceptionTraceback = exc_info
-    print exceptionTraceback.tb_lineno
     tb_list = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
     tb_message = ''.join(tb_list)
     match = re.search(r'(.*)line\s(\d*)(.*)', tb_message, re.M | re.S)
@@ -111,51 +113,29 @@ class Sandbox(object):
         self.lock = threading.Lock()
         self.mleq = None
 
-    def __go(self, file_name, glbls, lcls):
+    def executeControlCode(self, file_name, glbls, lcls):
         """Function to facilitate execution of control code"""
-        fp = None
+        # Get the path and module name
+        path, module_name = os.path.split(file_name)
+        # import the module
         try:
-            import tempfile
-            f = open(file_name, 'r')
-            fp = tempfile.TemporaryFile()
-            # No import required magic
-            magic = """
-from lib.services import service
-
-import logging
-log = logging.getLogger("ControlCode")
-debug = log.debug
-info = log.info
-warning = log.warning
-error = log.error
-critical = log.critical
-"""
-            fp.write(magic)
-            # Append the hwm
-            fp.write(f.read())
-            # Don't forget to rewind! (this is necessary)
-            fp.seek(0)
-            # Now use imp magic to import the module
-            pathname, module_name = os.path.split(file_name)
-            
-            cc = imp.load_module(module_name[:-3], fp, pathname, ('.cc', 'r', imp.PY_SOURCE))
+            module = importspecial.importOverride(module_name[:-3])
+            # inject more things into the namespace that provide extended funtionality
             for name, ptr in glbls.items():
-                setattr(cc, name, ptr)
+                setattr(module, name, ptr)
+            # Start the HWM (Device) specified Services
             self.startDeviceServices()
-            cc.main()
+            # Turn on import override
+            importspecial.overrideImport()
+            # Call Main
+            module.main()
+            # Catch any runtime exceptions in the control code
         except Exception as error:
-            exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-            tb_list = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
-            tb_message = ''
-            for line in tb_list:
-                tb_message += line
-            self.log.error('Control Code Error:\n\t'+tb_message)
+            logError(sys.exc_info(), self.log.error, 'Control Code Error:', importspecial.MAGIC_LINE_NUMS)
         finally:
-            # Since we may exit via an exception, close fp explicitly.
-            if fp:
-                fp.close()
-        
-
+            # Turn off import overriding
+            importspecial.restoreImport()
+    
     def extractLocals(self, local_vars, methods):
         """Extracts Local Variables"""
         obj_cache = {}
@@ -196,7 +176,7 @@ critical = log.critical
         global_vars['stop'] = self.stopControlCode
         log.info('Starting Control Code Execution')
         threading.settrace(tracer)
-        self.proc = threading.Thread(target=self.__go,
+        self.proc = threading.Thread(target=self.executeControlCode,
                         args=(file_name, global_vars, local_vars))
         self.proc.start()
         self.proc.join()
@@ -227,7 +207,7 @@ critical = log.critical
                     self.log.error('Hardware Module Service Error: %s.%s is not a valid service' % (service[0], service[1]))
                 except Exception as error:
                     logError(sys.exc_info(), self.log.error, 'Hardware Module Service Error:')
-
+    
     def handleEvents(self):
         """Handles Events"""
         try:
@@ -240,7 +220,7 @@ critical = log.critical
                         evt()
         except Exception as error:
             logError(sys.exc_info(), self.log.error, 'Error while Handling an Event:', 10)
-
+    
     def registerDeviceServices(self, devices):
         """Cycle through devices and register hardware services."""
         try:
@@ -256,41 +236,58 @@ critical = log.critical
             for line in tb_list:
                 tb_message += line
             self.log.error('Sandbox HWM Services Error:\n'+tb_message)
-
+    
+    def addSubDirectories(self, path):
+        """Function that adds all sub directories to the CC_PATH"""
+        for root_path, _, _ in os.walk(path):
+            importspecial.CC_PATH.append(root_path)
+    
+    def setupCCPath(self, path):
+        """Configures the CC_PATH for importing special .cc files"""
+        # Add cwd/files and sub directories
+        self.addSubDirectories(os.path.join(path, 'files')) # Working Directory's cc folder
+        self.addSubDirectories(os.path.join(path, 'modules')) # Working Directory's cc folder
+        self.addSubDirectories(os.path.join(sys.path[0], 'files')) # ORP's builtin cc folder
+        self.addSubDirectories(os.path.join(sys.path[0], 'modules')) # ORP's builtin cc folder
+    
     def startUp(self, devices, path, file_name, lock, running, queue):
         """Preforms startup activities"""
         lib_dir = os.path.join(os.getcwd(), 'lib')
         os.chdir(path)
         sys.path.append(path)
         sys.path.append(lib_dir)
-
+        
+        # Setup the .cc path
+        self.setupCCPath(path)
+        
         # Register event queue
         self.queue = queue
         self.running = running
         self.running.value = True
         
         self.mleq = MultiLevelEventQueue(queue, lock)
-
+        
         # Register the kill function
         signal.signal(signal.SIGINT, signalShutdown)
-
+        
         # Connect to the Daemon's Log Server
         log = self.root_log = logging.getLogger('')
         log.setLevel(logging.DEBUG)
         log = self.log = logging.getLogger('Sandbox')
         log.setLevel(logging.DEBUG)
-
+        
         # Connect to the orpd xmlrpc server
         self.orpd_server = xmlrpclib.Server('http://localhost:7003/')
-
+        
         # Serve forevere
         log.info('Sandbox Starting...')
-
+        
         # Setup device services
         self.registerDeviceServices(devices)
-
+        
         # Run the Control Code
         self.runControlCode(file_name, lock, running)
         
         # Exit Cleanly
         sys.exit(0)
+    

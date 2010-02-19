@@ -2,7 +2,7 @@ from time import sleep
 
 @service
 def asdf():
-    triggerEvent('bob', 5, '50 Objects1')
+    #triggerEvent('bob', 5, '50 Objects1')
     1/0
     log.info('hi')
     sleep(3)
