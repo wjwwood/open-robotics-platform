@@ -68,7 +68,7 @@ warning = log.warning
 error = log.error
 critical = log.critical
 """
-MAGIC_LINE_NUMS = len(MAGIC.split('\n') - 1)
+MAGIC_LINE_NUMS = len(MAGIC.split('\n')) - 1
 
 # Save the old __import__ reference
 BUILTIN_IMPORT = __builtins__["__import__"]
@@ -86,10 +86,11 @@ def logError(exc_info, log_func, msg, line_no_delta=0):
 
 def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
     """This is an override for __import__
-    
+        
     It first trys to import normally, but if it cannot it trys to 
     import files with .cc extensions, and if it does import a .cc file it 
-    adds some magic to it."""
+    adds some magic to it.
+    """
     module = None
     # First try the system __import__ first
     try:
@@ -113,6 +114,7 @@ def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
                     module_file = open(os.path.join(path, name+'.cc'), 'r')
                     # Read the module contents into the temp file
                     temp_file.write(module_file.read())
+                    module_file.close()
                     # Now rewind the temp file so it can be read from the beginning
                     temp_file.seek(0)
                     # Now import the module
@@ -120,11 +122,20 @@ def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
                         module = imp.load_module(name, temp_file, path, ('.cc', 'r', imp.PY_SOURCE))
                     except Exception as exception:
                         logError(sys.exc_info(), log.error, 'Error importing control code file %s.cc:' % name)
+                    finally:
+                        temp_file.close()
                     log.debug('Module %s loaded from %s using the special .cc import' % (name, path), MAGIC_LINE_NUMS)
         # If module is still None, we didn't find it and we should raise the original error
         if not module:
             raise error
     return module
 
-# Replace __import__ with importOverride
-__builtins__["__import__"] = importOverride
+def overrideImport():
+    """Turns import overriding on"""
+    # Replace __import__ with importOverride
+    __builtins__["__import__"] = importOverride
+
+def restoreImport():
+    """Restores the default import mechanism"""
+    # Restore __import__ with thre orignial import mechanism
+    __builtins__["__import__"] = BUILTIN_IMPORT

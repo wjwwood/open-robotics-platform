@@ -129,7 +129,9 @@ class RPCServer(SimpleXMLRPCServer):
         self.sandbox_queue = Queue()
         self.sandbox_proc = \
             Process("Sandbox", target=self.sandbox.startUp,
-                args=(self.daemon.device_objects, self.daemon.work_directory, control_code, self.sandbox_lock, self.sandbox_running, self.sandbox_queue))
+                args=(self.daemon.device_objects, self.daemon.work_directory, 
+                        control_code, self.sandbox_lock, self.sandbox_running, 
+                        self.sandbox_queue))
         self.sandbox_proc.start()
         Timer(0.5, self.joinControlCode).start()
         # Attempt to call start() on each of the devices that are running
