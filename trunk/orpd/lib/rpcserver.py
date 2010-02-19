@@ -4,7 +4,7 @@
 ###########
 # ORP - Open Robotics Platform
 #
-# Copyright (c) 2009 John Harrison, William Woodall
+# Copyright (c) 2010 John Harrison, William Woodall
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +29,10 @@
 rpcserver.py - Contains the RPCServer class which defines the available \
 functions in the rpc server.
 
-Created by William Woodall on 2009-09-18.
+Created by William Woodall on 2010-09-18.
 """
 __author__ = "William Woodall"
-__copyright__ = "Copyright (c) 2009 John Harrison, William Woodall"
+__copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 
 ###  Imports  ###
 

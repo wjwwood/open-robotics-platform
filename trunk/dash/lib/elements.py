@@ -4,7 +4,7 @@
 ###########
 # ORP - Open Robotics Platform
 # 
-# Copyright (c) 2009 John Harrison, William Woodall
+# Copyright (c) 2010 John Harrison, William Woodall
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +28,10 @@
 """
 elements.py - Contains all the major elements of the GUI for ease of access
 
-Created by William Woodall on 2009-11-02.
+Created by William Woodall on 2010-11-02.
 """
 __author__ = "William Woodall"
-__copyright__ = "Copyright (c) 2009 John Harrison, William Woodall"
+__copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 
 ###  Variables  ###
 
