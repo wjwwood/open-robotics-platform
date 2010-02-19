@@ -86,6 +86,13 @@ class Device(object):
         "A callback for CC shutdown"
         pass
         
+    def __str__(self):
+        if self.name:
+            return self.name + '.*'
+        
+    def __repr__(self):
+        return self.__str__()
+        
 class SerialListener(Thread):
     """This is a facility for mapping callbacks to messages over serial
 
