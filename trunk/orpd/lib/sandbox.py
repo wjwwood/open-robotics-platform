@@ -96,7 +96,7 @@ class EventRetriever(threading.Thread):
         while self.running.value:
             evt = self.queue.get(1)
             with self.lock:
-                self.mleq.addEvent(Event(evt[0], evt[1], evt[2], evt[3], self.callbacks, self.log))
+                self.mleq.addEvent(Event(evt[0], vt[1], evt[2], self.callbacks, self.log))
 
 class Sandbox(object):
     """Contains functions and data common to the sandbox"""
@@ -108,7 +108,6 @@ class Sandbox(object):
         self.timer = None
         self.server = None
         self.queue = None
-        self.callbacks = {}
         self.evt_handler = None
         self.mleq = MultiLevelEventQueue()
         self.lock = threading.Lock()
@@ -183,10 +182,6 @@ critical = log.critical
             local_vars.update({method : var})
         return local_vars
 
-    def registerCallback(self, reference_call, func):
-        "Register Callbacks with the event systems"
-        self.callbacks[reference_call] = func
-
     def runControlCode(self, file_name, l, running):
         """runs the control code"""
         global lck
@@ -212,18 +207,6 @@ critical = log.critical
         """Stops the control code"""
         self.running.value = False
         self.evt_handler.join()
-
-    def triggerEvent(self, name, priority, data, func_name=None):
-        """Allows Control Code to trigger events"""
-        event = []
-        if func_name == None:
-            event.append(traceback.extract_stack()[-2][2])
-        else:
-            event.append(func_name)
-        event.append(name)
-        event.append(priority)
-        event.append(data)
-        self.queue.put(event)
 
     def startDeviceServices(self):
         """Starts Services specified by Devices"""
@@ -263,8 +246,9 @@ critical = log.critical
         try:
             for device in devices:
                 service_list = device.getServices()
-                for service in service_list:
-                    self.hardware_modules_services.append(service)
+                if service_list and len(service_list):
+                    for service in service_list:
+                      self.hardware_modules_services.append(service)
         except Exception as error:
             exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
             tb_list = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)

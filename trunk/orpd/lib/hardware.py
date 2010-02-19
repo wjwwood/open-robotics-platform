@@ -54,15 +54,16 @@ class Device(object):
         self.name = config['name']
         self.log = logging.getLogger(self.name)
 
-    def triggerEvent(self, name, priority, data, obj_name=None):
-        """Allows Control Code to trigger events"""        
-        if not obj_name:
-            obj_name = self.name
-        event = []
-        event.append(obj_name)
-        event.append(name)
-        event.append(priority)
-        event.append(data)
+    def triggerEvent(self, name, data, obj_name=None):
+        """Allows Control Code to trigger events"""
+        split_name = name.split('.')
+        if len(split_name) == 2:
+            obj_name = split_name[0]
+            name = split_name[1]
+        else:
+            if not obj_name:
+                obj_name = self.name
+        event = [obj_name, name, data]
         if XMLRPCSERVER != None and XMLRPCSERVER.sandbox_running != None and XMLRPCSERVER.sandbox_running.value:
             XMLRPCSERVER.sandbox_queue.put(event)
         else:
