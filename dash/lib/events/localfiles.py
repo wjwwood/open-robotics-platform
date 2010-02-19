@@ -4,7 +4,7 @@
 ###########
 # ORP - Open Robotics Platform
 # 
-# Copyright (c) 2009 John Harrison, William Woodall
+# Copyright (c) 2010 John Harrison, William Woodall
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +28,10 @@
 """
 localfiles.py - Contains handlers related to local file actions
 
-Created by William Woodall on 2009-10-30.
+Created by William Woodall on 2010-10-30.
 """
 __author__ = "William Woodall"
-__copyright__ = "Copyright (c) 2009 John Harrison, William Woodall"
+__copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 
 ###  Imports  ###
 

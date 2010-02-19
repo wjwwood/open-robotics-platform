@@ -3,7 +3,7 @@
 ###########
 # ORP - Open Robotics Platform
 # 
-# Copyright (c) 2009 John Harrison, William Woodall
+# Copyright (c) 2010 John Harrison, William Woodall
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -27,10 +27,10 @@
 """
 console.py - Builds/Contains item that live in the console frame
 
-Created by William Woodall on 2009-11-09.
+Created by William Woodall on 2010-11-09.
 """
 __author__ = "William Woodall"
-__copyright__ = "Copyright (c) 2009 John Harrison, William Woodall"
+__copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 
 ###  Imports  ###
 
