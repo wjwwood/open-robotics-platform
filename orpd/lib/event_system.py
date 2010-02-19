@@ -2,15 +2,21 @@ import threading
 
 class Event(object):
     "Event Container"
-    def __init__(self, obj, name, priority, data, callbacks, log):
-        "Initialize the object variables"
+    def __init__(self, name, data, object, callbacks, log):
+        """  
+        Initialize the object variables
+        
+        Potential ways of calling this:
+          Event("name", data)
+          Event("name", data, "object")
+          Event("object.name", data)
+        """
         self.obj = obj
         self.name = name
-        self.priority = priority
         self.data = data
         self.log = log
         self.callbacks = callbacks
-        
+
     def __call__(self):
         import sys
         ref = self.obj+'.'+self.name
@@ -25,8 +31,30 @@ class MultiLevelEventQueue(object):
         "Setup the Multi-Level Event Queue"
         self.evts = {}
         self.filter = []
+        self.priority_map = {}
         for x in range(0, 10):
             self.evts[x] = []
+
+    def registerCallback(self, ref_name, func, priority = 5):
+        "Register Callbacks with the event systems"
+        pass
+
+    def setPriority(self, ref_name, priority = 5):
+        ""
+        pass
+
+    def triggerEvent(self, name, data, obj_name=None):
+        """Allows Control Code to trigger events"""
+        split_name = name.split('.')
+        if len(split_name) == 2:
+            obj_name = split_name[0]
+            name = split_name[1]
+        else:
+            if not obj_name:
+                obj_name = traceback.extract_stack()[-2][2]
+
+        event = [obj_name, name, data]
+        self.queue.put(event)
 
     def addEvent(self, evt):
         "Adds an event to the queue"
