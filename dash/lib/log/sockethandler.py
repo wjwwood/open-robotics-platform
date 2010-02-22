@@ -40,7 +40,6 @@ class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
     def handleLogRecord(self, record):
         # if a name is specified, we use the named logger rather than the one
         # implied by the record.
-        # print 'fadfadf>>>>', record
         if self.server.logname is not None:
             name = self.server.logname
         else:
