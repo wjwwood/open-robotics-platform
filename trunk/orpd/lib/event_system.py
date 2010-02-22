@@ -14,7 +14,7 @@ log = logging.getLogger("ControlCode")
 
 class Event(object):
     "Event Container Object."
-    def __init__(self, name, data, object):
+    def __init__(self, object, name, data):
         """ 
         Initialize the object variables
         """
@@ -105,7 +105,7 @@ class MultiLevelEventQueue(object):
             if not obj_name:
                 # TODO check this value
                 obj_name = traceback.extract_stack()[-2][2] 
-        self.addEvent(Event(name, data, obj_name))
+        self.addEvent(Event(obj_name, name, data))
 
     def __filter(self, x):
         "Event filter function"

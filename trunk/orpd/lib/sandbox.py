@@ -47,6 +47,7 @@ import logging
 import logging.handlers
 import xmlrpclib
 import re
+from multiprocessing import Queue
 # from SimpleXMLRPCServer import SimpleXMLRPCServer
 from threading import Timer
 from event_system import Event, MultiLevelEventQueue
@@ -95,9 +96,13 @@ class EventRetriever(threading.Thread):
     def run(self):
         """Overrides the run funtion in Thread"""
         while self.running.value:
-            evt = self.queue.get(1)
-            with self.lock:
-                self.mleq.addEvent(Event(evt[0], vt[1], evt[2]))
+            try:
+                evt = self.queue.get(True, 1)
+            except Exception as error:
+                pass
+            else:
+                with self.lock:
+                    self.mleq.addEvent(Event(evt[0], evt[1], evt[2]))
 
 class Sandbox(object):
     """Contains functions and data common to the sandbox"""
@@ -185,8 +190,17 @@ class Sandbox(object):
 
     def stopControlCode(self):
         """Stops the control code"""
+        log.info("Stopping Control Code")
+        timer = Timer(2, self._forceStop)
+        timer.start()
         self.running.value = False
         self.evt_handler.join()
+        timer.cancel()
+        
+    def _forceStop(self):
+        """Called if stopControlCode Fails"""
+        log.warning('Sandbox Failed to exit Cleanly')
+        sys.exit(1)
 
     def startDeviceServices(self):
         """Starts Services specified by Devices"""

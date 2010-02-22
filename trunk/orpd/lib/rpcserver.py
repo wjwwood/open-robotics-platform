@@ -138,7 +138,7 @@ class RPCServer(SimpleXMLRPCServer):
         for device in self.daemon.device_objects:
             try:
                 device.start()
-            except AttributeError as error:
+            except Exception as error:
                 log.error("Error executing start() of the %s device:\n\t\t\t%s" % (device.name, str(error)))
         return True
 
@@ -156,10 +156,15 @@ class RPCServer(SimpleXMLRPCServer):
                     break
                 self.sandbox_proc.join(1)
         finally:
+            self.sandbox = None
+            self.sandbox_proc = None
+            self.sandbox_lock = None
+            self.sandbox_running.value = False
+            self.sandbox_paused = False
             for device in self.daemon.device_objects:
                 try:
                     device.stop()
-                except AttributeError as error:
+                except Exception as error:
                     log.error("Error executing stop() of the %s device:\n\t\t\t%s" % (device.name, str(error)))
 
     def xmlrpc_stopControlCode(self):

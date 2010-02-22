@@ -95,7 +95,7 @@ def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
     # First try the system __import__ first
     try:
         module = BUILTIN_IMPORT(name, glbls, lcls, fromlist, level)
-        log.debug('Module %s loaded using builtin import' % name)
+        log.debug('Module %s loaded using builtin import' % str(name))
     except ImportError as error:
         # Next we will try to import them as a *.cc
         # First we need to determine if it exists
