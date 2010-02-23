@@ -48,6 +48,7 @@ import logging
 import ctypes
 
 # Other Libraries
+import orpd
 from orpd import network_handlers
 from sandbox import Sandbox
 
@@ -139,7 +140,7 @@ class RPCServer(SimpleXMLRPCServer):
             try:
                 device.start()
             except Exception as error:
-                log.error("Error executing start() of the %s device:\n\t\t\t%s" % (device.name, str(error)))
+                orpd.logError(sys.exc_info(), self.log.error, "Error executing start() of the %s device:" % device.name, orpd.HWM_MAGIC_LINENO)
         return True
 
     def joinControlCode(self):
@@ -165,7 +166,7 @@ class RPCServer(SimpleXMLRPCServer):
                 try:
                     device.stop()
                 except Exception as error:
-                    log.error("Error executing stop() of the %s device:\n\t\t\t%s" % (device.name, str(error)))
+                    orpd.logError(sys.exc_info(), self.log.error, "Error executing stop() of the %s device:" % device.name, orpd.HWM_MAGIC_LINENO)
 
     def xmlrpc_stopControlCode(self):
         """Stops the sandbox, returns false if it times out"""

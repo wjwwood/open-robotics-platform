@@ -47,12 +47,15 @@ import inspect
 import ctypes
 import tempfile
 import imp
+import traceback
+import re
 from multiprocessing import Value
 
 # Import ORP Modules
 import hardware
 from loggingserver import LogRecordSocketReceiver
 from rpcserver import RPCServer
+from logerror import logError
 
 try: # try to catch any missing dependancies
 # YAML for configuration files
@@ -63,6 +66,21 @@ try: # try to catch any missing dependancies
 except ImportError as PKG_ERROR: # We are missing something, let them know...
     sys.stderr.write(str(PKG_ERROR)+"\nYou might not have the "+PKGNAME+" \
 module, try 'easy_install "+PKGNAME+"', else consult google.")
+
+###  Defines  ###
+HWM_MAGIC = \
+"""
+from lib.hardware import Device, expose
+import logging
+log = logging.getLogger(%s)
+debug = log.debug
+info = log.info
+warning = log.warning
+error = log.error
+critical = log.critical
+"""
+
+HWM_MAGIC_LINENO = len(HWM_MAGIC.split('\n')) - 1
 
 ###  Class  ###
 
@@ -87,9 +105,8 @@ class ORPDaemon(object):
         
         # Load Configs
         self.loadConfigs(config_file_name)
-        self.log.info('Using work directory: '+os.getcwd())
         
-        # Setup xmlrpc server
+        # Setup the port
         if port != None:
             self.port = port
         else:
@@ -97,6 +114,13 @@ class ORPDaemon(object):
                 self.port = self.config['port']
             except KeyError:
                 self.port = 7003
+                
+        # Start Network Logging
+        self.startNetowrkLogging()
+        
+        # Announce the working directory
+        self.log.info('Working Directory: '+os.getcwd())
+        
         # Create the RPC Server
         self.xml_server = RPCServer(('', self.port), self)
         # Enables Introspection, part of the SimpleXMLRPCServer Class
@@ -106,18 +130,12 @@ class ORPDaemon(object):
         
         # Create hardware objects from configs
         self.createObjects()
-        
-        # Notify that the server is ready
-        self.log.info('Server Ready')
-
+    
     def startLogging(self):
         """Setups the logger for the daemon and a logging server"""
         # Setup the logger for this daemon
         self.log = logging.getLogger('ORPD')
-        # Setup a network logging server
-        self.logging_server = LogRecordSocketReceiver(port=7006)
-        thread.start_new_thread(self.logging_server.serve_until_stopped, ())
-
+    
     def setupWorkingDirectory(self, wk_directory = None):
         """Setups the working directory"""
         work_directory = self.work_directory = wk_directory
@@ -128,8 +146,7 @@ class ORPDaemon(object):
             return
         # Make sure the directory exists
         if not os.path.exists(work_directory):
-            self.log.warning('Work directory specified does not exist:\n\t\t\t'\
-                                                                +work_directory)
+            self.log.warning('Work directory specified does not exist: %s' % work_directory)
             self.setupWorkingDirectory()
             return
         # Now we have a working directory that exists set it
@@ -155,42 +172,21 @@ class ORPDaemon(object):
         self.config_file_name = config_file_name
         self.config = config
     
-    def importHardwareModule(self, module_name, name):
-        """Checks, mangles, and imports the HW module, returns the classes"""
-        # Import the module
-        f = open('modules/'+module_name+'.hwm', 'r')
-        fp = tempfile.TemporaryFile()
-        # No import required magic
-        magic = \
-"""
-from lib.hardware import Device, expose
-import logging
-log = logging.getLogger(%s)
-debug = log.debug
-info = log.info
-warning = log.warning
-error = log.error
-critical = log.critical
-""" % ('\"'+name+'\"')
-        fp.write(magic)
-        # Append the hwm
-        fp.write(f.read())
-        # Don't forget to rewind! (this is necessary)
-        fp.seek(0)
-        # Now use imp magic to import the module
-        try:
-            hwmodule = imp.load_module(module_name, fp, 'modules/'+module_name+'.hwm', ('.hwm', 'r', imp.PY_SOURCE))
-        except Exception as err:
-            self.log.error('Error importing the module %s\n\t\t\t%s' % (name, str(err)))
-            return None
-        # The class should now be in the local dict
-        for attr in dir(hwmodule):
-            attribute = getattr(hwmodule, attr)
-            if inspect.isclass(attribute):
-                target_name = attribute.__name__.lower()
-                target_name = target_name.replace('_', '-')
-                if target_name != 'Device' and target_name == module_name:
-                    return attribute
+    def startNetowrkLogging(self):
+        """Sets up and starts the network logging server"""
+        # Setup a network logging server
+        self.logging_server = LogRecordSocketReceiver(port = self.port+3)
+        thread.start_new_thread(self.logging_server.serve_until_stopped, ())
+    
+    def createObjects(self):
+        """Creates objects based on config files and hardware modules"""
+        # Parse config
+        devices = self.config['Devices']
+        for device in devices:
+            self.createObject(device, devices[device])
+        # Register the device isntances with the server
+        for device_object in self.device_objects:
+            self.exposeDeviceFunctions(device_object)
     
     def createObject(self, name, config):
         """Trys to create an object with the given configs"""
@@ -201,38 +197,53 @@ critical = log.critical
                 # Try to import the hardware module
                 device_class = self.importHardwareModule(config['module'], config['name'])
                 if device_class == None:
-                    self.log.error('No proper class found for %s\n\t\t\t' % name+
-                                    'The class name should be the same as the module, '+ \
-                                    'camel case, and converting - to _')
-                    return
+                    self.log.error('Could not find the Device Class for the %s ' % name + \
+                                   'Hardware Module so the device will be disabled, make ' + \
+                                   'sure the name is spelled the same and that hyphens ' + \
+                                   'are replaced with underscores')
+                    return None
                 # Create the object
+                config_name = config['name']
                 try:
-                    exec(config['name']+" = device_class(config)")
-                    try:
-                        exec("device_class.init("+config['name']+")")
-                    except Exception as err:
-                        self.log.warning('Error initializing %s:\n\t\t\t%s' % (device_class.__name__, str(err)))
+                    exec(config_name+" = device_class(config)")
+                    exec("device_class.init("+config_name+")")
                     # Add the object to the list of device objects
-                    exec("self.device_objects.append(%s)" % config['name'])
+                    exec("self.device_objects.append(%s)" % config_name)
                 except Exception as error:
-                    self.log.error("Error creating device %s:\n\t\t\t%s" % (name,str(error)))
+                    logError(sys.exc_info(), self.log.error, 'Exception in Device %s:' % name, HWM_MAGIC_LINENO)
             else:
                 self.log.warning("Device %s is disabled, skipping..." % name)
         except KeyError as error:
             self.log.error("Manditory config '"+error.args[0]+\
-                           "' not found for device '"+name+"'")
-            self.log.error("Device %s will be disabled..." % name)
-            
-    def createObjects(self):
-        """Creates objects based on config files and hardware modules"""
-        # Parse config
-        devices = self.config['Devices']
-        for device in devices:
-            self.createObject(device, devices[device])
-        # Register the device isntances with the server
-        for device_object in self.device_objects:
-            self.exposeDeviceFunctions(device_object)
-        
+                           "' not found for device '"+name+"', the device will be disabled")
+    
+    def importHardwareModule(self, module_name, name):
+        """Checks, mangles, and imports the HW module, returns the classes"""
+        # Import the module
+        f = open('modules/'+module_name+'.hwm', 'r')
+        fp = tempfile.TemporaryFile()
+        # No import required magic
+        magic = HWM_MAGIC % ('\"'+name+'\"')
+        fp.write(magic)
+        # Append the hwm
+        fp.write(f.read())
+        # Don't forget to rewind! (this is necessary)
+        fp.seek(0)
+        # Now use imp magic to import the module
+        try:
+            hwmodule = imp.load_module(module_name, fp, 'modules/'+module_name+'.hwm', ('.hwm', 'r', imp.PY_SOURCE))
+        except Exception as err:
+            logError(sys.exc_info(), self.log.error, 'Error importing the module %s' % name, HWM_MAGIC_LINENO)
+            return None
+        # The class should now be in the local dict
+        for attr in dir(hwmodule):
+            attribute = getattr(hwmodule, attr)
+            if inspect.isclass(attribute):
+                target_name = attribute.__name__.lower()
+                target_name = target_name.replace('_', '-')
+                if target_name != 'Device' and target_name == module_name:
+                    return attribute
+    
     def exposeDeviceFunctions(self, device_object):
         """
         Looks at the device object and expose the 
@@ -250,6 +261,7 @@ critical = log.critical
         """Starts the XMLRPC Server"""
         self.new_work_dir = None
         try:
+            self.log.info('Server Ready')
             self.xml_server.serve_forever()
         except select.error:
             pass
