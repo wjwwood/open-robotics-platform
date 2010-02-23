@@ -36,13 +36,10 @@ __copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 ###  Imports  ###
 
 # Standard Python Libraries
-import sys
-import os
 import os.path
 import wx
 import threading
 import lib.elements as elements
-from subprocess import Popen, PIPE
 
 ###  Variables  ###
 process = None

@@ -3,11 +3,6 @@ MDI AUI Parent Frame for the dashboard application, will contain the
 rest of the windows for the dashboard.
 """
 import wx.aui
-import wx
-import logging
-import thread
-import xmlrpclib
-import os
 import os.path
 
 import lib.elements
@@ -126,31 +121,33 @@ class ParentFrame(wx.aui.AuiMDIParentFrame):
         window_size_save = open(os.path.join(self.app_runner.usr_home, 'dashboard.window_size'), 'w+')
         window_size_save.write(window_size)
         window_size_save.close()
-        
-        
+
     def buildListing(self):
         """Build a listing of the files in files and modules for connection"""
-        cc_list = self.__walkDirectory(os.path.join(
-            os.getcwd(), 'files'))
-        module_list = self.__walkDirectory(os.path.join(
-            os.getcwd(), 'modules'))
+        cc_list = self.walkDirectory(os.path.join(os.getcwd(), 'files'))
+        module_list = self.walkDirectory(os.path.join(os.getcwd(), 'modules'))
         return (cc_list, module_list)
 
-    def __walkDirectory(self, root_path):
-        """"""
+    def walkDirectory(self, root_path):
+        """A helperfunction that walks directories"""
         listing = {}
         for root, dirs, files in os.walk(root_path):
             abs_path = root.replace(root_path, '')[1:]
-            paths = abs_path.split('/')
+            paths = abs_path.split(os.sep)
             base_listing = listing
             for path in paths:
                 if len(path):
-                    base_listing = base_listing[path]
+                    if path in base_listing:
+                        base_listing = base_listing[path]
             for d in dirs:
+                if d[0] == '.':
+                    continue
+                # if d in base_listing:
                 base_listing[d] = {}
             for f in files:
-                if f[0] != '.' and not f.endswith(('.hwmo', '.hwmc', '.pyo', '.pyc', '.cco', '.ccc')):
+                if f[0] != '.' and not f.endswith(('.hwmo', '.hwmc', \
+                                                   '.pyo', '.pyc', \
+                                                   '.cco', '.ccc')):
                     full_path = os.path.join(root_path, abs_path, f)
                     base_listing[f] = (full_path, os.stat(full_path)[8])
         return listing
-
