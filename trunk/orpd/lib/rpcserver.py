@@ -260,7 +260,7 @@ class RPCServer(SimpleXMLRPCServer):
             self.log.info('Wrote file '+file_name)
         except IOError as error:
             self.log.error('Cannot write file: '+file_name+\
-                                    '\n\t\t\t'+str(error))
+                                    '\n'+str(error))
             result = False
         return result
 
@@ -318,6 +318,8 @@ class RPCServer(SimpleXMLRPCServer):
         """Walks the Directory"""
         listing = {}
         for root, _, files in os.walk(path):
+            if root[0] == '.':
+                continue
             file_path = root.replace(path, '')[1:]
             for f in files:
                 if f[0] != '.' and not f.endswith(('.hwmo', '.hwmc', '.pyo', '.pyc', '.cco', '.ccc')):

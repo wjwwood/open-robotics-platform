@@ -62,8 +62,6 @@ module, try 'easy_install "+PKGNAME+"', else consult google.")
 
 def sync_files(files):
     cc_files, hwm_files = files
-    # print "CC Files: ", cc_files
-    # print "HWM Files: ", hwm_files
     sync_files_helper(cc_files, "files", elements.MAIN.files[0])
     sync_files_helper(hwm_files, "modules", elements.MAIN.files[1])
     elements.MAIN.buildListing()
@@ -91,15 +89,13 @@ def sync_files_helper(files, root_folder, base_array):
                 pass
             elif file_array[1] > files[file]:
                 # Local copy is newer
-                # print 'local copy newer for: ', file
                 contents = open(file_array[0], 'r').read()
-                elements.REMOTE_SERVER.write(root_folder + '/' + file, contents, file_array[1])
+                elements.REMOTE_SERVER.write(os.path.join(root_folder, file), contents, file_array[1])
             elif file_array[1] < files[file]:
                 # Server Copy is newer
-                # print 'server copy newer for: ', file
                 file_path = os.path.join(os.getcwd(), root_folder, file)
                 with open(file_path, 'w+') as fp:
-                    fp.write(elements.REMOTE_SERVER.getFileContents(root_folder + '/' + file))
+                    fp.write(elements.REMOTE_SERVER.getFileContents(os.path.join(root_folder, file)))
                 os.utime(file_path, (files[file], files[file]))
             del parent_array[file_index_reference]
         except KeyError:
@@ -108,11 +104,10 @@ def sync_files_helper(files, root_folder, base_array):
                     os.makedirs(os.path.join(os.getcwd(), root_folder, os.path.split(file)[0]))
                 file_path = os.path.join(os.getcwd(), root_folder, file)
                 with open(file_path, 'w+') as fp:
-                    fp.write(elements.REMOTE_SERVER.getFileContents(root_folder + '/' + file))
+                    fp.write(elements.REMOTE_SERVER.getFileContents(os.path.join(root_folder, file)))
                 os.utime(file_path, (files[file], files[file]))
             except Exception as e:
                 traceback.print_exc(file=sys.stdout)
-                print "Report this bug."
                 
     walk_and_send_files(root_folder, local_array)
 
@@ -120,7 +115,9 @@ def walk_and_send_files(root, list):
     """Walks a hash and sends the files to the remote server."""
     if isinstance(list, dict):
         for file in list:
-            new_root = root + '/' + file
+            if file[0] == '.':
+                continue
+            new_root = os.path.join(root, file)
             walk_and_send_files(new_root, list[file])
     else:
         file_handler = open(list[0], 'r')
