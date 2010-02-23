@@ -37,6 +37,7 @@ __copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 ###  Imports  ###
 
 # Standard Python Libraries
+import sys
 import os
 import sys
 import types
