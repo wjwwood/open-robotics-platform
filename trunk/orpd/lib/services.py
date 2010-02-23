@@ -71,7 +71,7 @@ class Service(object):
                 self.func(*self.args, **self.kwargs)
             except Exception as exception:
                 self.stop()
-                logError(sys.exc_info(), log.error, 'Control Code Service Error:', importspecial.MAGIC_LINE_NUMS)
+                logError(sys.exc_info(), log.error, 'Control Code Service Error:', importspecial.MAGIC_LINENO)
     
     def start(self, *args, **kwargs):
         self.running = True

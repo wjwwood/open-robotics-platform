@@ -42,6 +42,8 @@ import traceback
 import logging
 from threading import Thread, Lock, Event
 
+import orpdaemon
+
 ###  Variables  ###
 XMLRPCSERVER = None
 
@@ -265,10 +267,13 @@ serial_listener.listen()
                 # determine if there is a callback for this message
                 for comparator, callback in self.handlers:
                     callback_event = None
-                    if inspect.isfunction(comparator) and comparator(message):
-                        callback_event = callback(message)
-                    if isinstance(comparator, bool) and comparator:
-                        callback_event = callback(message)
+                    try:
+                        if inspect.isfunction(comparator) and comparator(message):
+                            callback_event = callback(message)
+                        if isinstance(comparator, bool) and comparator:
+                            callback_event = callback(message)
+                    except Exception as err:
+                        logError(sys.exc_info, log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
             
             # Close everything after exiting the loop
             serial.close()
