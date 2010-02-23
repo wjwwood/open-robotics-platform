@@ -50,6 +50,8 @@ import ctypes
 # Other Libraries
 import orpd
 from orpd import network_handlers
+import orpdaemon
+from logerror import logError
 from sandbox import Sandbox
 
 ###  Class  ###
@@ -83,13 +85,19 @@ class RPCServer(SimpleXMLRPCServer):
             try:
                 func = self.funcs[method]
                 if func is not None:
-                    return func(*params)
+                    try:
+                        return func(*params)
+                    except Exception as err:
+                        logError(sys.exc_info(), self.log.error, 'Exception in RPC call %s' % method, orpdaemon.HWM_MAGIC_LINENO)
                 else:
-                    raise Exception('method "%s" is not supported' % method)
+                    raise Exception("Method '%s' is not supported by this Server" % method)
             except Exception:
                 return SimpleXMLRPCServer._dispatch(self, method, params)
         else:
-            return func(*params)
+            try:
+                return func(*params)
+            except Exception as err:
+                logError(sys.exc_info(), self.log.error, "Exception in RPC call %s" % method)
     
     def registerFunctions(self, functions):
         """Takes a dictionary, functions, and registers them"""
@@ -115,10 +123,10 @@ class RPCServer(SimpleXMLRPCServer):
         """Runs control code in the files dir"""
         # Check for correct parameters
         if control_code == None:
-            raise Exception("No control code file passed")
+            self.log.error("No Control Code passed to function runControlCode")
             return False
         if self.sandbox_proc != None and self.sandbox_proc.is_alive():
-            raise Exception("Control Code already running")
+            self.log.error("Control Code already running")
             return False
         if not os.path.exists(control_code):
             self.log.error('Control Code not found: ' + control_code)
@@ -140,7 +148,7 @@ class RPCServer(SimpleXMLRPCServer):
             try:
                 device.start()
             except Exception as error:
-                orpd.logError(sys.exc_info(), self.log.error, "Error executing start() of the %s device:" % device.name, orpd.HWM_MAGIC_LINENO)
+                logError(sys.exc_info(), self.log.error, "Error executing start() of the %s device:" % device.name, orpdaemon.HWM_MAGIC_LINENO)
         return True
 
     def joinControlCode(self):
@@ -157,6 +165,9 @@ class RPCServer(SimpleXMLRPCServer):
                     break
                 self.sandbox_proc.join(1)
         finally:
+            if self.sandbox_proc.exitcode == -signal.SIGTERM:
+                result = False
+                self.log.info('Control Code did not exit cleanly')
             self.sandbox = None
             self.sandbox_proc = None
             self.sandbox_lock = None
@@ -166,11 +177,12 @@ class RPCServer(SimpleXMLRPCServer):
                 try:
                     device.stop()
                 except Exception as error:
-                    orpd.logError(sys.exc_info(), self.log.error, "Error executing stop() of the %s device:" % device.name, orpd.HWM_MAGIC_LINENO)
+                    logError(sys.exc_info(), self.log.error, "Error executing stop() of the %s device:" % device.name, orpdaemon.HWM_MAGIC_LINENO)
+            self.log.info('Control Code Stopped')
 
     def xmlrpc_stopControlCode(self):
         """Stops the sandbox, returns false if it times out"""
-        self.log.info('Stopping Control Code')
+        self.log.info('Control Code Stopping')
         # Check to see if it is already stopped
         result = True
         if self.sandbox_proc == None or not self.sandbox_proc.is_alive():
@@ -182,13 +194,6 @@ class RPCServer(SimpleXMLRPCServer):
         self.sandbox_proc.join()
         if self.sandbox_proc.exitcode == -signal.SIGTERM:
             result = False
-            self.log.info('Sandbox Forcefully Stopped')
-        # Clean up
-        self.sandbox = None
-        self.sandbox_proc = None
-        self.sandbox_lock = None
-        self.sandbox_running.value = False
-        self.sandbox_paused = False
         return result
     
     def xmlrpc_pauseControlCode(self):
@@ -346,7 +351,7 @@ class RPCServer(SimpleXMLRPCServer):
         
     def xmlrpc_restart(self):
         """Restarts the server"""
-        self.log.info('Restarting the Server...')
+        self.log.info('Server Restarted')
         return self.xmlrpc_changeWorkDirectory(self.daemon.work_directory)
 
     def xmlrpc_changeWorkDirectory(self, work_dir):

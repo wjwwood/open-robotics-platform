@@ -46,6 +46,8 @@ import tempfile
 import re
 import traceback
 
+from logerror import logError
+
 # Setup logging
 log = logging.getLogger('ORPD')
 
@@ -54,35 +56,19 @@ CC_PATH = []
 CC_PATH.append(os.getcwd())
 
 # Magic to be added
-# NOTE: If you edit this you need to change the MAGIC_LINE_NUMS
+# NOTE: If you edit this you need to change the MAGIC_LINENO
 #        to match the number of Lines added to the .cc files 
 #        otherwise the line numbers in errors will be incorrect
 
 MAGIC = """
 from lib.services import service
-import logging
-log = logging.getLogger("Control Code")
-debug = log.debug
-info = log.info
-warning = log.warning
-error = log.error
-critical = log.critical
 """
-MAGIC_LINE_NUMS = len(MAGIC.split('\n')) - 1
+MAGIC_LINENO = len(MAGIC.split('\n')) - 1
 
 # Save the old __import__ reference
 BUILTIN_IMPORT = __builtins__["__import__"]
 
 ###  Functions  ###
-
-def logError(exc_info, log_func, msg, line_no_delta=0):
-    """Logs an error with a traceback"""
-    exceptionType, exceptionValue, exceptionTraceback = exc_info
-    tb_list = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
-    tb_message = ''.join(tb_list)
-    match = re.search(r'(.*)line\s(\d*)(.*)', tb_message, re.M | re.S)
-    tb_message = match.group(1) + 'line ' + str(int(match.group(2)) - line_no_delta) + match.group(3)
-    log_func(msg+'\n'+tb_message)
 
 def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
     """This is an override for __import__
@@ -95,7 +81,8 @@ def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
     # First try the system __import__ first
     try:
         module = BUILTIN_IMPORT(name, glbls, lcls, fromlist, level)
-        #log.debug('Module %s loaded using builtin import' % str(name))
+        # You cannot log in this namespace, due to an infinite regression issue, so don't try
+        # Although I am thinking that disabling the import override, logging, and re enabling it would work
     except ImportError as error:
         # Next we will try to import them as a *.cc
         # First we need to determine if it exists
@@ -121,10 +108,10 @@ def importOverride(name, glbls={}, lcls={}, fromlist=[], level=-1):
                     try:
                         module = imp.load_module(name, temp_file, path, ('.cc', 'r', imp.PY_SOURCE))
                     except Exception as exception:
-                        logError(sys.exc_info(), log.error, 'Error importing control code file %s.cc:' % name)
+                        logError(sys.exc_info(), log.error, 'Error importing control code file %s.cc:' % name, MAGIC_LINENO)
                     finally:
                         temp_file.close()
-                    log.debug('Module %s loaded from %s using the special .cc import' % (name, path), MAGIC_LINE_NUMS)
+                    log.debug('Module %s loaded from %s using the special .cc import' % (name, path))
         # If module is still None, we didn't find it and we should raise the original error
         if not module:
             raise error

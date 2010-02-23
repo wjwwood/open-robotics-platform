@@ -43,16 +43,6 @@ import logging.handlers
 import SocketServer
 import struct
 
-try: # try to catch any missing dependancies
-# <PKG> for <PURPOSE>
-    PKGNAME = '<EASY_INSTALL NAME>'
-    # import <LIBRARY NAME>
-
-    del PKGNAME
-except ImportError as PKG_ERROR: # We are missing something, let them know...
-    sys.stderr.write(str(PKG_ERROR)+"\nYou might not have the "+PKGNAME+" \
-module, try 'easy_install "+PKGNAME+"', else consult google.")
-
 ###  Class  ###
 
 class LogRecordStreamHandler(SocketServer.StreamRequestHandler):

@@ -53,6 +53,7 @@ from threading import Timer
 from event_system import Event, MultiLevelEventQueue
 
 # ORP Libs
+from logerror import logError
 from lib import importspecial
 
 ###  Functions  ###
@@ -67,15 +68,6 @@ def tracer(frame, event, args):
     lck.acquire()
     lck.release()
     return tracer
-    
-def logError(exc_info, log_func, msg, line_no_delta=0):
-    """Logs an error with a traceback"""
-    exceptionType, exceptionValue, exceptionTraceback = exc_info
-    tb_list = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
-    tb_message = ''.join(tb_list)
-    match = re.search(r'(.*)line\s(\d*)(.*)', tb_message, re.M | re.S)
-    tb_message = match.group(1) + 'line ' + str(int(match.group(2)) - line_no_delta) + match.group(3)
-    log_func(msg+'\n'+tb_message)
 
 ###  Classes  ###
 class Proxy(object):
@@ -92,7 +84,7 @@ class EventRetriever(threading.Thread):
         self.log = log
         self.lock = lock
         self.mleq = mleq
-
+    
     def run(self):
         """Overrides the run funtion in Thread"""
         while self.running.value:
@@ -103,6 +95,38 @@ class EventRetriever(threading.Thread):
             else:
                 with self.lock:
                     self.mleq.addEvent(Event(evt[0], evt[1], evt[2]))
+    
+
+class ProxyLogger(object):
+    """Proxy Logger that checks to make sure that logs get str()'ed before propagating"""
+    def __init__(self, logger):
+        self.logger = logger
+    
+    def log(self, level, msg):
+        """Posts a msg at a level to the logger"""
+        str_msg = str(msg)
+        self.logger.log(level, str_msg)
+    
+    def debug(self, msg):
+        """Logs a Debug Message"""
+        self.log(10, msg)
+    
+    def info(self, msg):
+        """Logs a Info Message"""
+        self.log(20, msg)
+    
+    def warning(self, msg):
+        """Logs a Warning Message"""
+        self.log(30, msg)
+    
+    def error(self, msg):
+        """Logs a Error Message"""
+        self.log(40, msg)
+    
+    def critical(self, msg):
+        """Logs a Critical Message"""
+        self.log(50, msg)
+    
 
 class Sandbox(object):
     """Contains functions and data common to the sandbox"""
@@ -136,7 +160,7 @@ class Sandbox(object):
             module.main()
             # Catch any runtime exceptions in the control code
         except Exception as error:
-            logError(sys.exc_info(), self.log.error, 'Control Code Error:', importspecial.MAGIC_LINE_NUMS)
+            logError(sys.exc_info(), self.log.error, 'Control Code Exception:', importspecial.MAGIC_LINENO)
         finally:
             # Turn off import overriding
             importspecial.restoreImport()
@@ -173,24 +197,28 @@ class Sandbox(object):
         log = self.log
         local_vars = locals()
         global_vars = self.extractLocals(globals(), self.orpd_server.listFunctions())
-        global_vars['log'] = log
+        plog = ProxyLogger(logging.getLogger('Control Code'))
+        global_vars['log'] = plog
+        global_vars['debug'] = plog.debug
+        global_vars['info'] = plog.info
+        global_vars['warning'] = plog.warning
+        global_vars['error'] = plog.error
+        global_vars['critical'] = plog.critical
         global_vars['registerCallback'] = self.mleq.registerCallback
         global_vars['setPriority'] = self.mleq.setPriority
         global_vars['handleEvents'] = self.handleEvents
         global_vars['triggerEvent'] = self.mleq.triggerEvent
         global_vars['stop'] = self.stopControlCode
-        log.info('Starting Control Code Execution')
+        log.info('Control Code Started')
         threading.settrace(tracer)
         self.proc = threading.Thread(target=self.executeControlCode,
                         args=(file_name, global_vars, local_vars))
         self.proc.start()
         self.proc.join()
         self.running.value = False
-        log.info('Control Code Exiting...')
 
     def stopControlCode(self):
         """Stops the control code"""
-        log.info("Stopping Control Code")
         timer = Timer(2, self._forceStop)
         timer.start()
         self.running.value = False
@@ -199,7 +227,6 @@ class Sandbox(object):
         
     def _forceStop(self):
         """Called if stopControlCode Fails"""
-        log.warning('Sandbox Failed to exit Cleanly')
         sys.exit(1)
 
     def startDeviceServices(self):
@@ -220,7 +247,7 @@ class Sandbox(object):
                 except AttributeError as error:
                     self.log.error('Hardware Module Service Error: %s.%s is not a valid service' % (service[0], service[1]))
                 except Exception as error:
-                    logError(sys.exc_info(), self.log.error, 'Hardware Module Service Error:')
+                    logError(sys.exc_info(), self.log.error, 'Hardware Module Service Error:', importspecial.MAGIC_LINENO)
     
     def handleEvents(self):
         """Handles Events"""
@@ -233,7 +260,7 @@ class Sandbox(object):
                     if evt:
                         evt()
         except Exception as error:
-            logError(sys.exc_info(), self.log.error, 'Error while Handling an Event:', 10)
+            logError(sys.exc_info(), self.log.error, 'Error while Handling an Event:', importspecial.MAGIC_LINENO)
     
     def registerDeviceServices(self, devices):
         """Cycle through devices and register hardware services."""
@@ -244,12 +271,7 @@ class Sandbox(object):
                     for service in service_list:
                       self.hardware_modules_services.append(service)
         except Exception as error:
-            exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-            tb_list = traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)
-            tb_message = ''
-            for line in tb_list:
-                tb_message += line
-            self.log.error('Sandbox HWM Services Error:\n'+tb_message)
+            lgoError(sys.exc_info(), self.log.error, 'Sandbox HWM Services Error:', importspecial.MAGIC_LINENO)
     
     def addSubDirectories(self, path):
         """Function that adds all sub directories to the CC_PATH"""
@@ -294,7 +316,7 @@ class Sandbox(object):
         self.orpd_server = xmlrpclib.Server('http://localhost:7003/')
         
         # Serve forevere
-        log.info('Sandbox Starting...')
+        log.debug('Sandbox Started')
         
         # Setup device services
         self.registerDeviceServices(devices)
@@ -303,5 +325,6 @@ class Sandbox(object):
         self.runControlCode(file_name, lock, running)
         
         # Exit Cleanly
+        log.debug('Sandbox Stopped')
         sys.exit(0)
     

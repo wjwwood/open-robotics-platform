@@ -10,7 +10,7 @@ __copyright__ = "Copyright (c) 2009 John Harrison, William Woodall"
 import traceback
 import logging
 callbacks = {}
-log = logging.getLogger("ControlCode")
+log = logging.getLogger("Control Code")
 
 class Event(object):
     "Event Container Object."

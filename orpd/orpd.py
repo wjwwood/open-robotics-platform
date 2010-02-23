@@ -146,7 +146,7 @@ def startup(argv=sys.argv):
             orpd = ORPDaemon(work_directory=work_dir)
         else:
             running = False
-    orpd.log.info('Stopping the server...')
+    orpd.log.info('Server Stopped')
     orpd.logging_server.shutdown()
 
 ###  If Main  ###
