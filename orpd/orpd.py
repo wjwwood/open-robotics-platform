@@ -126,10 +126,8 @@ def startLogging():
     except ConfigParser.NoSectionError as error:
         # No config files, load defaults
         log = loadDefaultLogger()
-        log.warning('Exception loading logging config files\
-        \n\t\t\t%s' % error)
-        log.info('Using default logging settings')
-    log.info('Logging has started...')
+        log.debug('Exception loading logging config, Using default logging settings')
+    log.debug('Logger Started')
 
 def startup(argv=sys.argv):
     """This is the main function that creates objects and starts the server"""
@@ -138,7 +136,6 @@ def startup(argv=sys.argv):
     # Create and start the Daemon
     from lib.orpdaemon import ORPDaemon
     orpd = ORPDaemon(work_directory=configs['work_directory'], config_file_name=configs['config_file_name'])
-    orpd.log.info('Starting the server...')
     running = True
     while running:
         # Register the shutdown signal
