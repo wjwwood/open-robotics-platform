@@ -13,7 +13,6 @@ class RemoteCallEvent(wx.PyCommandEvent):
     RemoteCallEvent object to store remote calls from the robot to
     the GUI.
     """
-
     eventType = WXCONSOLE
     def __init__(self, window_id, data):
         wx.PyCommandEvent.__init__(self, self.eventType, window_id)

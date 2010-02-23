@@ -38,6 +38,7 @@ __copyright__ = "Copyright (c) 2010 John Harrison, William Woodall"
 
 # Standard Python Libraries
 import os
+import sys
 import types
 import signal
 from multiprocessing import Process, Lock, Value, Queue
@@ -309,8 +310,11 @@ class RPCServer(SimpleXMLRPCServer):
             root.addHandler(network)
             self.log_servers.append(network)
             self.network_handlers[self.client_addr[0]] = network
+    
+    def xmlrpc_fileSync(self):
+        "Synchronize the files between the server and the client"
         return self.__buildListing()
-            
+        
     def __buildListing(self):
         """Build a listing of the files in files and modules for connection"""
         cc_list = self.__walkDirectory(os.path.join(
@@ -323,9 +327,11 @@ class RPCServer(SimpleXMLRPCServer):
         """Walks the Directory"""
         listing = {}
         for root, _, files in os.walk(path):
-            if root[0] == '.':
-                continue
+            # if root[0] == '.':
+                # continue
             file_path = root.replace(path, '')[1:]
+            if file_path and filter(lambda x: x[0] == '.', file_path.split(os.sep)):
+                continue
             for f in files:
                 if f[0] != '.' and not f.endswith(('.hwmo', '.hwmc', '.pyo', '.pyc', '.cco', '.ccc')):
                     full_path = os.path.join(path, file_path, f)

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Paster commands for an easy way of starting the system.
 

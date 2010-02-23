@@ -64,15 +64,14 @@ def sync_files(files):
     cc_files, hwm_files = files
     sync_files_helper(cc_files, "files", elements.MAIN.files[0])
     sync_files_helper(hwm_files, "modules", elements.MAIN.files[1])
-    elements.MAIN.buildListing()
+    # buildListing()
     elements.MAIN.project_drawer.updateList()
-    
-    
+
 def sync_files_helper(files, root_folder, base_array):
     local_array = copy.deepcopy(base_array)
     for file in files:
         try:
-            path_array = file.split('/')
+            path_array = file.split(os.sep)
             parent_array = file_array = local_array
             file_index_reference = None
             try:
@@ -82,10 +81,9 @@ def sync_files_helper(files, root_folder, base_array):
                         file_array = file_array[x]
                         file_index_reference = x
             except KeyError as filename_error:
-                pass
+                pass # this is supposed to happen, we handle it below
             if file_array[1] == files[file]:
-                # Same file
-                # print 'same file'
+                # Same file, 
                 pass
             elif file_array[1] > files[file]:
                 # Local copy is newer
@@ -93,6 +91,7 @@ def sync_files_helper(files, root_folder, base_array):
                 elements.REMOTE_SERVER.write(os.path.join(root_folder, file), contents, file_array[1])
             elif file_array[1] < files[file]:
                 # Server Copy is newer
+                # this is handling the key error above
                 file_path = os.path.join(os.getcwd(), root_folder, file)
                 with open(file_path, 'w+') as fp:
                     fp.write(elements.REMOTE_SERVER.getFileContents(os.path.join(root_folder, file)))
@@ -100,7 +99,7 @@ def sync_files_helper(files, root_folder, base_array):
             del parent_array[file_index_reference]
         except KeyError:
             try:
-                if file.find('/') != -1:
+                if file.find(os.sep) != -1:
                     os.makedirs(os.path.join(os.getcwd(), root_folder, os.path.split(file)[0]))
                 file_path = os.path.join(os.getcwd(), root_folder, file)
                 with open(file_path, 'w+') as fp:
@@ -108,7 +107,6 @@ def sync_files_helper(files, root_folder, base_array):
                 os.utime(file_path, (files[file], files[file]))
             except Exception as e:
                 traceback.print_exc(file=sys.stdout)
-                
     walk_and_send_files(root_folder, local_array)
 
 def walk_and_send_files(root, list):
@@ -129,7 +127,7 @@ def connect(event):
     location = elements.TOOLBAR.server_addr.GetValue()
     try:
         elements.REMOTE_SERVER = xmlrpclib.Server('http://' + str(location) + ':7003/')
-        sync_files(elements.REMOTE_SERVER.connect())
+        elements.REMOTE_SERVER.connect()
         elements.TOOLBAR.connect_button.SetLabel('Disconnect')
         elements.TOOLBAR.connect_button.Bind(wx.EVT_BUTTON, disconnect)
         elements.MAIN.SetStatusText('Connected')
@@ -144,6 +142,9 @@ def connect(event):
     elements.TOOLBAR.shutdown_button.Enable()
     elements.TOOLBAR.restart_button.Enable()
     elements.TOOLBAR.RC_button.Enable()
+    
+    # Synchronize Files
+    sync_files(elements.REMOTE_SERVER.fileSync())
 
 def disconnect(event):
     """Attempts to disconnect from the remote server"""
