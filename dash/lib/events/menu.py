@@ -57,6 +57,14 @@ def toggleProjectDrawer(event):
     """This will toggle the Project Drawer hidden/shown"""
     pass
     
+def openCameraData(event):
+    sys.path.append('widgets')
+    import camera
+    cam = camera.getWidget()(MAIN, -1, elements.TOOLBAR.server_addr.GetValue())
+    MAIN._mgr.AddPane(cam)
+    MAIN._mgr.GetPane(cam).Float()
+    MAIN._mgr.Update()
+    
 def openLRFData(event):
     """Opens the LRF data view"""
     sys.path.append('widgets')

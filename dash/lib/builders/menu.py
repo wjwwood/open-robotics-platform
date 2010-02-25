@@ -13,6 +13,7 @@ ID_SAVE_LOGS = wx.NewId()
 ID_EXIT = wx.NewId()
 
 ID_PROJECT_DRAWER = wx.NewId()
+ID_CAMERA_WIDGET = wx.NewId()
 ID_LRF_DEMO = wx.NewId()
 
 class Menus(object):
@@ -75,11 +76,13 @@ class Menus(object):
         
         # Add the items to the menu
         view_menu.AppendCheckItem(ID_PROJECT_DRAWER, "Project Drawer")
+        view_menu.AppendCheckItem(ID_CAMERA_WIDGET, "View Camera Data")
         view_menu.AppendCheckItem(ID_LRF_DEMO, "View LRF Data")
         
         # Bind Events to the Menu Items
         from lib.events import menu
         self.parent.Bind(wx.EVT_MENU, menu.toggleProjectDrawer, id=ID_PROJECT_DRAWER)
+        self.parent.Bind(wx.EVT_MENU, menu.openCameraData, id=ID_CAMERA_WIDGET)
         self.parent.Bind(wx.EVT_MENU, menu.openLRFData, id=ID_LRF_DEMO)
         
         # Add the View Menu to the Menubar
