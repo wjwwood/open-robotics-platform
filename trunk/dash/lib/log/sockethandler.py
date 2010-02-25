@@ -26,6 +26,7 @@ class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
             while len(chunk) < slen:
                 chunk = chunk + self.connection.recv(slen - len(chunk))
             obj = self.unPickle(chunk)
+            print obj['msg']
             record = logging.makeLogRecord(obj)
             self.handleLogRecord(record)
             self.handleLogEvent(record)
