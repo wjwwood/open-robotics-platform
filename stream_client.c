@@ -45,7 +45,7 @@ int main(int argc, char** argv)
     height      = atoi(argv[4]);
  
     /* create image */
-    img = cvCreateImage(cvSize(width, height), IPL_DEPTH_8U, 1);
+    img = cvCreateImage(cvSize(width, height), IPL_DEPTH_8U, 3);
     cvZero(img);
  
     /* run the streaming client as a separate thread */
@@ -53,7 +53,7 @@ int main(int argc, char** argv)
         quit("pthread_create failed.", 1);
     }
  
-    fprintf(stdout, "Press 'q' to quit.\n\n");
+    //fprintf(stdout, "Press 'q' to quit.\n\n");
     cvNamedWindow("stream_client", CV_WINDOW_AUTOSIZE);
  
     while(key != 'q') {
@@ -109,7 +109,8 @@ void* streamClient(void* arg)
     }
  
     int  imgsize = img->imageSize;
-    char sockdata[imgsize];
+    char *sockdata = malloc(sizeof(char) * imgsize + 1);
+    fprintf(stdout, "imgsize is: %d\n\n", img->widthStep);
     int  i, j, k, bytes;
  
     /* start receiving images */
@@ -125,11 +126,13 @@ void* streamClient(void* arg)
         /* convert the received data to OpenCV's IplImage format, thread safe */
         pthread_mutex_lock(&mutex);
  
-        for (i = 0, k = 0; i < img->height; i++) {
+        /* for (i = 0, k = 0; i < img->height; i++) {
             for (j = 0; j < img->width; j++) {
                 ((uchar*)(img->imageData + i * img->widthStep))[j] = sockdata[k++];
             }
-        }
+        } */
+
+        memcpy(img->imageData, sockdata, imgsize);
  
         is_data_ready = 1;
         pthread_mutex_unlock(&mutex);

@@ -12,7 +12,6 @@ class NetworkEventHandler(logging.Handler):
 
     def emit(self, record):
         try:
-            print record
             msg = self.format(record)
             event = LogRxEvent(self.win_id, msg)
             self.handler.AddPendingEvent(event)

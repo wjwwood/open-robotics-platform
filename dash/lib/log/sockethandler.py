@@ -3,7 +3,7 @@ import logging
 import logging.handlers
 import SocketServer
 import struct
-
+import lib.elements as e
 
 class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
     """Handler for a streaming logging request.
@@ -26,7 +26,9 @@ class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
             while len(chunk) < slen:
                 chunk = chunk + self.connection.recv(slen - len(chunk))
             obj = self.unPickle(chunk)
-            print obj['msg']
+            if obj['levelno'] == 11:
+                e.MAIN.orp_data_buffer = obj['msg']
+                continue
             record = logging.makeLogRecord(obj)
             self.handleLogRecord(record)
             self.handleLogEvent(record)
