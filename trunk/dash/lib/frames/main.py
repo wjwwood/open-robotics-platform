@@ -24,6 +24,8 @@ class ParentFrame(wx.aui.AuiMDIParentFrame):
         self.id = ID
         self.app_runner = app_runner
         
+        self.orp_data_buffer = None
+        
         # File hashes
         self.files = self.buildListing()
         

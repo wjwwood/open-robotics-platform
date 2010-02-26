@@ -3,6 +3,8 @@ import wx
 import xmlrpclib
 import Image
 import base64
+import zlib
+import lib.elements as e
 from threading import Lock
 
 class CameraWidget(wx.Window):
@@ -44,7 +46,7 @@ class CameraWidget(wx.Window):
 
         self.running = False
         
-        self.period = 1000
+        self.period = 66
         TIMER_ID = wx.NewId()
         self.timer = wx.Timer(self, TIMER_ID)
         self.timer.Start(self.period)
@@ -60,18 +62,16 @@ class CameraWidget(wx.Window):
         if not self.running:
             return
         # Set the data
-        with self.lock:
-            import time
-            a = time.time()
-            self.data = self.remote_server.cam1.getImage()
-            b = time.time()
-            print b - a 
+        # with self.lock:
+        self.data = e.MAIN.orp_data_buffer
         if self.data:
-            pi = Image.fromstring("RGB", (self.data[0], self.data[1]),  base64.b64decode(self.data[4]))
+            pi = Image.fromstring("RGB", (self.data[0], self.data[1]), base64.b64decode(zlib.decompress(self.data[4])))
             wximg = wx.EmptyImage(self.data[0], self.data[1])
             wximg.SetData(pi.convert("RGB").tostring())
             wximg.SetAlphaData(pi.convert("RGBA").tostring()[3::4])
             self.bitmap.SetBitmap(wx.BitmapFromImage(wximg))
+        else:
+            print 'no image to display'
         
     def onClose(self, event=None):
         """docstring for OnClose"""
@@ -84,7 +84,9 @@ class CameraWidget(wx.Window):
             # Stop
             self.running = False
             self.button.SetLabel('Stop')
+            self.remote_server.cam1.stopGatheringImages()
         else:
+            self.remote_server.cam1.startGatheringImages(66)
             self.running = True
             self.button.SetLabel('Get Pictures')
     
