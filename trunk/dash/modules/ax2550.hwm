@@ -12,6 +12,7 @@ You should list any information about your HW module here.
 
 # Import some useful libraries
 import thread
+from time import sleep
 
 class AX2550(Device):
     """This class allows you to control an ax2550 motor controller"""
@@ -28,17 +29,18 @@ class AX2550(Device):
         # Try to open and configure the serial port
         try:
             self.serial = Serial(self.serial_port)
-            self.serial.timeout = 1
+            self.serial.timeout = 0.4
             self.serial.baud = "9600"
             self.serial.bytesize = 7
             self.serial.parity = "E"
             self.serial.stopbits = 1
             self.serial.close()
             self.serial.open()
-            self.serial.write('\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n')
         except Exception as err:
             error('Error opening/configuring the serial port for %s' % self.name)
             raise err
+        # Ensure the mc is in Serial Mode
+
         # Setup the lock to synchronize the setting of motor speeds
         self.speed_lock = Lock()
         self.serial_lock = Lock()
@@ -46,11 +48,51 @@ class AX2550(Device):
         self.left_speed = 0
         self.right_speed = 0
         self.running = True
+        self.sync()
         thread.start_new_thread(self.keepAlive, ())
         
+    def sync(self):
+        """This function ensures that the motor controller is in serial mode"""
+        try:
+            self.serial_lock.acquire()
+            self.speed_lock.acquire()
+            # First clean the buffers out
+            sio = self.serial
+            sio.flushInput()
+            sio.flushOutput()
+            sio.flush()
+            # Reset the Motor Controller, incase it is in the Serial mode already
+            sio.write('\r\n'+'%'+'rrrrrr\r\n')
+            changing_modes = True
+            line = ''
+            token = sio.read(1)
+            while changing_modes:
+                line += token
+                if token == '\r':
+                    if line.strip() != '':
+                        pass
+                        # print line
+                    line = ''
+                    sio.write('\r')
+                    token = sio.read(1)
+                if token == 'O':
+                    token = sio.read(1)
+                    if token == 'K':
+                        changing_modes = False
+                else:
+                    token = sio.read(1)
+        finally:
+            self.serial_lock.release()
+            self.speed_lock.release()
+        info('Motor Controller Synchronized')
+
+    def shutdown(self):
+        """Called when the server shutsdown"""
+        self.running = False
+
     def keepAlive(self):
         """This functions sends the latest motor speed to prevent the dead man 
-            system from stopping the motors
+            system from stopping the motors.
         """
         try:
             from time import sleep

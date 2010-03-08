@@ -40,6 +40,7 @@ import sys
 import os
 import traceback
 import logging
+import inspect
 from threading import Thread, Lock, Event
 
 import orpdaemon
@@ -55,7 +56,7 @@ class Device(object):
         self.config = config
         self.name = config['name']
         self.log = logging.getLogger(self.name)
-
+    
     def triggerEvent(self, name, data, obj_name=None):
         """Allows Control Code to trigger events"""
         split_name = name.split('.')
@@ -70,7 +71,7 @@ class Device(object):
             XMLRPCSERVER.sandbox_queue.put(event)
         else:
             self.log.debug("Event dropped. No running CC. Event: " + str(event))
-                
+    
     def init(self):
         'Called when daemon starts'
         pass
@@ -81,23 +82,25 @@ class Device(object):
     
     def getServices(self):
         """A list of services the hardware module can start. 
-        retrun Format:  [["<library>", "<function>", (args,), [kwargs]], ...]"""
+            retrun Format:  [["<library>", "<function>", (args,), [kwargs]], ...]
+        """
         pass
     
     def stop(self):
         "A callback for CC shutdown"
         pass
-        
+    
     def __str__(self):
         if self.name:
             return self.name + '.*'
-        
+    
     def __repr__(self):
         return self.__str__()
-        
+    
+
 class SerialListener(Thread):
     """This is a facility for mapping callbacks to messages over serial
-
+        
 Specifically this can be used to register callback functions to 
 specific messages from somthing like a serial port.
 
@@ -122,7 +125,7 @@ listen(clear=False)->None
     monitoring the serial_port for messages. The clear parameter if False will 
     process any existing data in the serial buffer, but if True it will clear the 
     serial data buffer before parsing the data.
-    
+        
 stopListening()->None
     Throws Exception: will raise any seiral errors that occur
      Stops listening if you are listening.  Does nothing if you are not currently
@@ -138,23 +141,22 @@ def isReset(msg):
     if 'RST' in msg:
         return True
     return False
-    
+
 def resetReceived(msg):
     log.debug(self.name+' microcontroller reset: '+msg)
-    msg.skip() # This notifies the SerialListener to pass the msg to more handlers
-    
+
 import serial
 my_serial_obj = serial.Serial('/dev/ttyS0')
-
+        
 serial_listener = SerialListener(my_serial_obj)
 serial_listener.addHandler(isReset, resetReceived)
 serial_listener.listen()
-
+        
 #In this example every message is passed to one handler function.
 
 def handler(msg):
     log.debug("From micro1 "+msg)
-    
+
 import serial
 my_serial_obj = serial.Serial('/dev/ttyS0')
 
@@ -162,8 +164,8 @@ serial_listener = SerialListener(my_serial_obj)
 serial_listener.addHandler(True, handler)
 serial_listener.listen()
 ------------------
-"""
-    def __init__(self, serial_port=None, delimiter='\r'):
+    """
+    def __init__(self, serial_port=None, delimiters=('\r','\n')):
         # Check the value of serial_port and see if it was passed
         Thread.__init__(self)
         if serial_port != None:
@@ -175,7 +177,7 @@ serial_listener.listen()
         self._listening_lock = Lock()
         self._listening_event = Event()
         self.handlers = []
-        self.delimiter = delimiter
+        self.delimiters = delimiters
         self._start()
         
     def __del__(self):
@@ -241,13 +243,14 @@ serial_listener.listen()
     
     def run(self):
         """Overrides Thread's run method"""
+        serial = self.serial_port
         # Open the serial port if it isn't
         while self._running:
             try:
                 if not serial.isOpen():
                     serial.open()
             except Exception as error:
-                error.args = ("Error opening Serial Port, did you pass a serial port object or a string?",)
+                error.args = ("Error opening Serial Port, did you pass a serial port object and not a string?",)
                 raise error
             
             while True:
@@ -260,7 +263,7 @@ serial_listener.listen()
                 if not temp_listening or not self._running:
                     break
                 # Read until you get a delimiter
-                while token != self.delimiter:
+                while token not in self.delimiters:
                     token = serial.read()
                     message += token
                 # We have gotten a delimiter now we need to 
@@ -268,9 +271,8 @@ serial_listener.listen()
                 for comparator, callback in self.handlers:
                     callback_event = None
                     try:
-                        if inspect.isfunction(comparator) and comparator(message):
-                            callback_event = callback(message)
-                        if isinstance(comparator, bool) and comparator:
+                        if ((inspect.isfunction(comparator) or inspect.ismethod(comparator)) and comparator(message)) or \
+                                                                        (isinstance(comparator, bool) and comparator):
                             callback_event = callback(message)
                     except Exception as err:
                         logError(sys.exc_info, log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
@@ -290,10 +292,10 @@ serial_listener.listen()
          function that is called iff the comparator returns True and is also 
          passed the msg."""
         # Make sure that the comparator is either a function or a boolean
-        if not (inspect.isfunction(comparator) or isinstance(comparator, bool)):
+        if not (inspect.isfunction(comparator) or inspect.ismethod(comparator) or isinstance(comparator, bool)):
             raise ValueError("Invalid comparator passed to addHandler, must be a function or boolean")
         # If comparator is a function check to make sure it takes atleast 1 argument beyond self
-        if inspect.isfunction(comparator):
+        if inspect.isfunction(comparator) or inspect.ismethod(comparator):
             args = inspect.getargspec(comparator).args
             try:
                 args.remove('self')
@@ -301,7 +303,7 @@ serial_listener.listen()
             if len(args) == 0:
                 raise ValueError("Invalid comparator passed to addHandler, must take atleast one argument")
         # Make sure that the callback is a function
-        if not inspect.isfunction(callback):
+        if not (inspect.isfunction(callback) or inspect.ismethod(callback)):
             raise ValueError("Invalid callback passed to addHandler, must be a function")
         else:
             # Make sure it has atleast one argument for the msg
