@@ -100,7 +100,7 @@ class PS3(object):
                 ## useful for debugging
                 # print 'speed:', speed, 'direction:', direction
                 try:
-                    elements.REMOTE_SERVER.mc.move(speed/8.0, direction/8.0)
+                    elements.REMOTE_SERVER.mc.move(speed/2.0, direction/2.0)
                 except:
                     pass
             self.event.clear()

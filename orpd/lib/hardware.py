@@ -235,53 +235,67 @@ serial_listener.listen()
         
     def _join(self, timeout=None):
         """Internal shortcut to Thread's join method"""
-        Thread._join(self, timeout)
+        Thread.join(self, timeout)
         
     def join(self, timeout=None):
         """Overrides Thread's join method"""
-        raise NotImplementedError
+        self._listening_lock.acquire()
+        self._listening = False
+        self._listening_lock.release()
+        self._running = False
+        self._listening_event.set()
+        self._join()
     
     def run(self):
         """Overrides Thread's run method"""
-        serial = self.serial_port
-        # Open the serial port if it isn't
-        while self._running:
-            try:
-                if not serial.isOpen():
-                    serial.open()
-            except Exception as error:
-                error.args = ("Error opening Serial Port, did you pass a serial port object and not a string?",)
-                raise error
+        try:
+            serial = self.serial_port
+            # Open the serial port if it isn't
+            while self._running:
+                try:
+                    if not serial.isOpen():
+                        serial.open()
+                except Exception as error:
+                    error.args = ("Error opening Serial Port, did you pass a serial port object and not a string?",)
+                    raise error
+                while True:
+                    token = ''
+                    message = ''
+                    # Make sure we are still supposed to be listening
+                    self._listening_lock.acquire()
+                    temp_listening = self._listening
+                    self._listening_lock.release()
+                    if not temp_listening or not self._running:
+                        break
+                    # Read until you get a delimiter
+                    while token not in self.delimiters:
+                        token = serial.read()
+                        message += token
+                        self._listening_lock.acquire()
+                        temp_listening = self._listening
+                        self._listening_lock.release()
+                        if not temp_listening or not self._running:
+                            break
+                    if not temp_listening or not self._running:
+                        break
+                    # We have gotten a delimiter now we need to 
+                    # determine if there is a callback for this message
+                    for comparator, callback in self.handlers:
+                        callback_event = None
+                        try:
+                            if ((inspect.isfunction(comparator) or inspect.ismethod(comparator)) and comparator(message)) or \
+                                                                            (isinstance(comparator, bool) and comparator):
+                                callback_event = callback(message)
+                        except Exception as err:
+                            logError(sys.exc_info, log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
             
-            while True:
-                token = ''
-                message = ''
-                # Make sure we are still supposed to be listening
-                self._listening_lock.acquire()
-                temp_listening = self._listening
-                self._listening_lock.release()
-                if not temp_listening or not self._running:
-                    break
-                # Read until you get a delimiter
-                while token not in self.delimiters:
-                    token = serial.read()
-                    message += token
-                # We have gotten a delimiter now we need to 
-                # determine if there is a callback for this message
-                for comparator, callback in self.handlers:
-                    callback_event = None
-                    try:
-                        if ((inspect.isfunction(comparator) or inspect.ismethod(comparator)) and comparator(message)) or \
-                                                                        (isinstance(comparator, bool) and comparator):
-                            callback_event = callback(message)
-                    except Exception as err:
-                        logError(sys.exc_info, log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
-            
-            # Close everything after exiting the loop
-            serial.close()
-            # Wait for either __del__ or listen to be called again
-            self._listening_event.wait()
-            self._listening_event.clear()
+                # Close everything after exiting the loop
+                serial.close()
+                # Wait for either __del__ or listen to be called again
+                self._listening_event.wait()
+                self._listening_event.clear()
+        except Exception as err:
+            print err
         
     def addHandler(self, comparator, callback):
         """Adds a handler to the SerialListener

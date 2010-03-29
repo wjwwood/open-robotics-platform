@@ -48,7 +48,7 @@ class LaserRangeFinderWidget(wx.Window):
                 i += 360
             theta.append(i)
         theta = [i*pi/180 for i in theta]
-        radii = [1000 for x in range(0, 769)]
+        radii = [4000 for x in range(0, 769)]
         
         self.line, = self.axes.plot(theta, radii)
         
@@ -87,7 +87,7 @@ class LaserRangeFinderWidget(wx.Window):
         # Prepare the data
         i = 0
         for x in radii:
-            if x > 1000:
+            if x > 4000:
                 radii[i] = 20
             elif x < 20:
                 radii[i] = 20
@@ -122,3 +122,7 @@ if __name__ == '__main__':
     frame.Show(True)
     LRF = LaserRangeFinderWidget(frame, config='localhost')
     app.MainLoop()
+    
+if __name__ == '__main__':
+    app = wx.App()
+    LaserRangeFinderWidget(None, -1, 'localhost')
