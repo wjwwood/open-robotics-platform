@@ -137,10 +137,16 @@ class ParentFrame(wx.aui.AuiMDIParentFrame):
             abs_path = root.replace(root_path, '')[1:]
             paths = abs_path.split(os.sep)
             base_listing = listing
+            temp_path = None
             for path in paths:
                 if len(path):
+                    if path[0] == '.':
+                        temp_path = path
+                        break
                     if path in base_listing:
                         base_listing = base_listing[path]
+            if temp_path != None and temp_path[0] == '.':
+                continue
             for d in dirs:
                 if d[0] == '.':
                     continue

@@ -328,8 +328,8 @@ class RPCServer(SimpleXMLRPCServer):
         """Walks the Directory"""
         listing = {}
         for root, _, files in os.walk(path):
-            # if root[0] == '.':
-                # continue
+            if root[0] == '.':
+                continue
             file_path = root.replace(path, '')[1:]
             if file_path and filter(lambda x: x[0] == '.', file_path.split(os.sep)):
                 continue
