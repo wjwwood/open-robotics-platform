@@ -11,8 +11,10 @@ You should list any information about your HW module here.
 """
 
 # Import some useful libraries
-import thread
+from threading import Timer
 from time import sleep
+from lib.hardware import SerialListener
+import inspect
 
 class AX2550(Device):
     """This class allows you to control an ax2550 motor controller"""
@@ -39,8 +41,7 @@ class AX2550(Device):
         except Exception as err:
             error('Error opening/configuring the serial port for %s' % self.name)
             raise err
-        # Ensure the mc is in Serial Mode
-
+        self.keep_alive_timer = None
         # Setup the lock to synchronize the setting of motor speeds
         self.speed_lock = Lock()
         self.serial_lock = Lock()
@@ -49,10 +50,28 @@ class AX2550(Device):
         self.right_speed = 0
         self.running = True
         self.sync()
-        thread.start_new_thread(self.keepAlive, ())
+        # Setup a Serial Listener
+        self.serial_listener = SerialListener(self.serial)
+        self.serial_listener.addHandler(self.isInRCMode, self.sync)
+        self.serial_listener.listen()
         
-    def sync(self):
+    def isInRCMode(self, msg):
+        """Determines if a msg indicates that the motor controller is in RC mode"""
+        if msg != '' and msg[0] == ':':
+            # It is an RC message
+            info('Motor Controller appears to be in RC Mode, Syncing...')
+            return True
+        else:
+            return False
+    
+    def sync(self, msg=None):
         """This function ensures that the motor controller is in serial mode"""
+        info("Syncing MC")
+        listening = None
+        if hasattr(self, 'serial_listener'):
+            listening = self.serial_listener.isListening()
+        if listening:
+            self.serial_listener.stopListening()
         try:
             self.serial_lock.acquire()
             self.speed_lock.acquire()
@@ -84,29 +103,50 @@ class AX2550(Device):
         finally:
             self.serial_lock.release()
             self.speed_lock.release()
+            if listening:
+                self.serial_listener.listen()
         info('Motor Controller Synchronized')
 
     def shutdown(self):
         """Called when the server shutsdown"""
         self.running = False
-
+        self.serial_listener.join()
+        del self.serial_listener
+        
+    def start(self):
+        """Called when Control Code Starts"""
+        self.running = True
+        self.keepAlive()
+    
+    def stop(self):
+        """Called when Control Code Stops"""
+        self.running = False
+        if self.keep_alive_timer:
+            self.keep_alive_timer.cancel()
+    
+    @expose
+    def disableKeepAlive(self):
+        """Stops any running keep alive mechanism"""
+        self.stop()
+    
+    @expose
     def keepAlive(self):
         """This functions sends the latest motor speed to prevent the dead man 
             system from stopping the motors.
         """
         try:
-            from time import sleep
-            while self.running:
-                sleep(0.5)
-                # Lock the speed lock
-                self.speed_lock.acquire()
-                # Resend the current motor speeds
-                self.__setSpeed(self.left_speed, self.right_speed)
-                # Release the speed lock
-                self.speed_lock.release()
+            # Lock the speed lock
+            self.speed_lock.acquire()
+            # Resend the current motor speeds
+            self.__setSpeed(self.left_speed, self.right_speed)
+            # Release the speed lock
+            self.speed_lock.release()
         except Exception as err:
             error(str(err))
-            
+        if self.running:
+            self.keep_alive_timer = Timer(0.4, self.keepAlive)
+            self.keep_alive_timer.start()
+    
     @expose
     def move(self, speed=0.0, direction=0.0):
         """Adjusts the motors based on the speed and direction you specify.
