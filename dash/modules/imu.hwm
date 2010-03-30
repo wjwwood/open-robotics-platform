@@ -1,0 +1,99 @@
+"""
+This is a hardware module to interface with our custom IMU.
+"""
+
+# Import some useful libraries
+from threading import Timer
+from time import sleep
+from serial import Serial
+from lib.hardware import SerialListener
+
+class IMU(Device):
+    """This class provides related functionality concerned with interfacing with our custom IMU"""
+    def init(self):
+        """Function called after object instantiation"""
+        # Get the serial port name
+        try:
+            self.serial_port = self.config['serial']
+        except AttributeError as err:
+            error('%s is missing a configuration.' % self.name)
+            raise err
+        # Try to open and configure the serial port
+        try:
+            self.serial = Serial()
+            self.serial.port = self.serial_port
+            self.serial.timeout = 0.4
+            self.serial.baud = 115200
+            self.serial.open()
+        except Exception as err:
+            error('Error opening/configuring the serial port for %s' % self.name)
+            raise err
+        # Setup a Serial Listener
+        self.serial_listener = SerialListener(self.serial)
+        self.serial_listener.addHandler(True, self.logMessages)
+        self.serial_listener.listen()
+    
+    def logMessages(self, message):
+        """Logs the messages to a file"""
+        f = open("/home/william/orp/orpd/imu.txt", "rw")
+        f.write(message)
+        info(message)
+    
+    def shutdown(self):
+        """Called when the server shutsdown"""
+        self.serial_listener.join()
+        del self.serial_listener
+    
+    def start(self):
+        """Called when Control Code Starts"""
+        pass
+    
+    def stop(self):
+        """Called when Control Code Stops"""
+        pass
+    
+    @expose
+    def getAngle(self):
+        """Polls the IMU for one angle, which will be returned in an event at a later point"""
+        pass
+    
+    @expose
+    def pollOn(self):
+        """Turns angle polling on if it isn't on already"""
+        pass
+    
+    @expose
+    def pollOff(self):
+        """Turns angle polling off if it isn't off already"""
+        pass
+    
+    @expose
+    def pollToggle(self):
+        """Toggles angle polling, if it is off it will turn on, vica versa"""
+        pass
+    
+    @expose
+    def zeroAngle(self):
+        """Zeros the IMU"""
+        pass
+    
+    @expose
+    def calibrate(self):
+        """Calibrates the IMU, blocks until calibration is complete"""
+        pass
+    
+    @expose
+    def calibrateDeferred(self):
+        """Calibrates the IMU, returns immediately and posts an event when complete"""
+        pass
+    
+    @expose
+    def turnToAngle(self, destination_angle):
+        """Instructs the IMU to turn to a specific angle, returns when the desired angle is reached"""
+        pass
+    
+    @expose
+    def turnToAngleDeferred(self):
+        """Instructs the IMU to turn to a specific angle, returns immediately, and an event is generated when the target angle is reached"""
+        pass
+    
