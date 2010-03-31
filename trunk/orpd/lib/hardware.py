@@ -293,7 +293,8 @@ serial_listener.listen()
                                                                             (isinstance(comparator, bool) and comparator):
                                 callback_event = callback(message)
                         except Exception as err:
-                            logError(sys.exc_info, self.log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
+			    print 'asdf'
+                            logError(sys.exc_info(), self.log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
             
                 # Close everything after exiting the loop
                 serial.close()
@@ -301,7 +302,8 @@ serial_listener.listen()
                 self._listening_event.wait()
                 self._listening_event.clear()
         except Exception as err:
-            logError(sys.exc_info, self.log.error, 'Exception in Serial Listener:', orpdaemon.HWM_MAGIC_LINENO)
+	    print 'fdsa'
+            logError(sys.exc_info(), self.log.error, 'Exception in Serial Listener:', orpdaemon.HWM_MAGIC_LINENO)
         
     def addHandler(self, comparator, callback):
         """Adds a handler to the SerialListener
