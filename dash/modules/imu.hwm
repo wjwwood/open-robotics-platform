@@ -38,11 +38,13 @@ class IMU(Device):
     def sync(self):
         """Attempts to synchronize with the IMU"""
         # Send the Calibrate command to ensure that the IMU is calibrating
+        sleep(0.5) # A short pause to let the uC catch up, not sure if this is necessary or not
         debug("IMU Calibrating")
         self.serial.write('c')
     
     def logMessages(self, message):
         """Logs the messages to a file"""
+        print message
         try:
             f = open("/home/william/orp/orpd/imu.txt", "rw")
             f.write(message)
@@ -71,7 +73,7 @@ class IMU(Device):
     @expose
     def pollOn(self):
         """Turns angle polling on if it isn't on already"""
-        pass
+        self.serial.write('p')
     
     @expose
     def pollOff(self):
