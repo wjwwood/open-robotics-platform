@@ -43,6 +43,8 @@ import logging
 import inspect
 from threading import Thread, Lock, Event
 
+from logerror import logError
+
 import orpdaemon
 
 ###  Variables  ###
@@ -148,7 +150,7 @@ def resetReceived(msg):
 import serial
 my_serial_obj = serial.Serial('/dev/ttyS0')
         
-serial_listener = SerialListener(my_serial_obj)
+serial_listener = SerialListener(my_serial_obj, log)
 serial_listener.addHandler(isReset, resetReceived)
 serial_listener.listen()
         
@@ -160,18 +162,22 @@ def handler(msg):
 import serial
 my_serial_obj = serial.Serial('/dev/ttyS0')
 
-serial_listener = SerialListener(my_serial_obj)
+serial_listener = SerialListener(my_serial_obj, log)
 serial_listener.addHandler(True, handler)
 serial_listener.listen()
 ------------------
     """
-    def __init__(self, serial_port=None, delimiters=('\r','\n')):
+    def __init__(self, serial_port=None, logger=None, delimiters=('\r','\n')):
         # Check the value of serial_port and see if it was passed
         Thread.__init__(self)
         if serial_port != None:
             self.serial_port = serial_port
         else:
-            raise ValueError("serial_port must not be None")
+            raise ValueError("You must pass a valid serial port for the first parameter")
+	if logger != None:
+            self.log = logger
+        else:
+            raise ValueError("You must pass a valid logger for the first parameter")
         self._running = True
         self._listening = False
         self._listening_lock = Lock()
@@ -287,7 +293,7 @@ serial_listener.listen()
                                                                             (isinstance(comparator, bool) and comparator):
                                 callback_event = callback(message)
                         except Exception as err:
-                            logError(sys.exc_info, log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
+                            logError(sys.exc_info, self.log.error, 'Exception handling serial message:', orpdaemon.HWM_MAGIC_LINENO)
             
                 # Close everything after exiting the loop
                 serial.close()
@@ -295,7 +301,7 @@ serial_listener.listen()
                 self._listening_event.wait()
                 self._listening_event.clear()
         except Exception as err:
-            print err
+            logError(sys.exc_info, self.log.error, 'Exception in Serial Listener:', orpdaemon.HWM_MAGIC_LINENO)
         
     def addHandler(self, comparator, callback):
         """Adds a handler to the SerialListener

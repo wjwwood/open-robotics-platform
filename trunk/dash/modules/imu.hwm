@@ -28,16 +28,27 @@ class IMU(Device):
         except Exception as err:
             error('Error opening/configuring the serial port for %s' % self.name)
             raise err
+        # Synchronize with the IMU
+        self.sync()
         # Setup a Serial Listener
-        self.serial_listener = SerialListener(self.serial)
+        self.serial_listener = SerialListener(self.serial, self.log)
         self.serial_listener.addHandler(True, self.logMessages)
         self.serial_listener.listen()
     
+    def sync(self):
+        """Attempts to synchronize with the IMU"""
+        # Send the Calibrate command to ensure that the IMU is calibrating
+        debug("IMU Calibrating")
+        self.serial.write('c')
+    
     def logMessages(self, message):
         """Logs the messages to a file"""
-        f = open("/home/william/orp/orpd/imu.txt", "rw")
-        f.write(message)
-        info(message)
+        try:
+            f = open("/home/william/orp/orpd/imu.txt", "rw")
+            f.write(message)
+            info(message)
+        except Exception as error:
+            error(error)
     
     def shutdown(self):
         """Called when the server shutsdown"""

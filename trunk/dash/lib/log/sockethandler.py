@@ -4,6 +4,7 @@ import logging.handlers
 import SocketServer
 import struct
 import lib.elements as e
+from threading import Event
 
 class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
     """Handler for a streaming logging request.
@@ -72,6 +73,7 @@ class LogRecordSocketReceiver(SocketServer.ThreadingTCPServer):
     def serve_until_stopped(self):
         import select
         abort = 0
+	self.running = Event()
         while not abort:
             rd, wr, ex = select.select([self.socket.fileno()],
                                        [], [],
@@ -79,4 +81,5 @@ class LogRecordSocketReceiver(SocketServer.ThreadingTCPServer):
             if rd:
                 self.handle_request()
             abort = self.abort
+	self.running.set()
 

@@ -2,6 +2,7 @@
 MDI AUI Parent Frame for the dashboard application, will contain the
 rest of the windows for the dashboard.
 """
+import sys
 import wx.aui
 import os.path
 
@@ -13,7 +14,7 @@ from lib.builders import toolbar
 from lib.builders import menu
 import lib.log
 
-class ParentFrame(wx.aui.AuiMDIParentFrame):
+class ParentFrame(wx.aui.AuiMDIParentFrame, wx.Frame):
     """
     AUI Parent Frame
     """
@@ -104,6 +105,8 @@ class ParentFrame(wx.aui.AuiMDIParentFrame):
         
     def onClose(self, event):
         """Called on close"""
+	# Stop the logging server
+	lib.elements.NETWORK_LOG_SERVER.abort = True
         # Save the Perspective
         perspective = self._mgr.SavePerspective()
         perspective_save = open(os.path.join(self.app_runner.usr_home, 'dashboard.Perspective'), 'w+')
@@ -123,6 +126,7 @@ class ParentFrame(wx.aui.AuiMDIParentFrame):
         window_size_save = open(os.path.join(self.app_runner.usr_home, 'dashboard.window_size'), 'w+')
         window_size_save.write(window_size)
         window_size_save.close()
+	sys.exit(0)
 
     def buildListing(self):
         """Build a listing of the files in files and modules for connection"""

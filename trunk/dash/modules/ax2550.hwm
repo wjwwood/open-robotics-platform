@@ -51,7 +51,7 @@ class AX2550(Device):
         self.running = True
         self.sync()
         # Setup a Serial Listener
-        self.serial_listener = SerialListener(self.serial)
+        self.serial_listener = SerialListener(self.serial, self.log)
         self.serial_listener.addHandler(self.isInRCMode, self.sync)
         self.serial_listener.listen()
         
