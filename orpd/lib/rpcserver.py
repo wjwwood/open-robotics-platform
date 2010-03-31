@@ -354,7 +354,7 @@ class RPCServer(SimpleXMLRPCServer):
                 device.shutdown()
             except Exception as error:
                 logError(sys.exc_info(), self.log.error, "Error executing shutdown() of the %s device:" % device.name, orpdaemon.HWM_MAGIC_LINENO)
-        self.log.info('Daemon Shutdown')
+        self.log.debug('Daemon Shutdown')
         # I do this so that the xmlrpc function can return properly.
         # If you just xmlrpc.shutdown() then,
         # the return None line never gets executed.
