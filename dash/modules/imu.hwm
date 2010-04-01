@@ -49,8 +49,9 @@ class IMU(Device):
             f = open("/home/william/orp/orpd/imu.txt", "rw")
             f.write(message)
             info(message)
-        except Exception as error:
-            error(error)
+        except Exception as err:
+            print 'here in imu'
+            error(err)
     
     def shutdown(self):
         """Called when the server shutsdown"""
