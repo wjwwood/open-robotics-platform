@@ -12,10 +12,16 @@ class IMU(Device):
     """This class provides related functionality concerned with interfacing with our custom IMU"""
     def init(self):
         """Function called after object instantiation"""
+        # Try to open the log file
+        self.log_file = None
+        try:
+            self.log_file = open(self.config['log_file'], 'w')
+        except KeyError as err:
+            pass
         # Get the serial port name
         try:
             self.serial_port = self.config['serial']
-        except AttributeError as err:
+        except KeyError as err:
             error('%s is missing a configuration.' % self.name)
             raise err
         # Try to open and configure the serial port
@@ -23,7 +29,7 @@ class IMU(Device):
             self.serial = Serial()
             self.serial.port = self.serial_port
             self.serial.timeout = 0.4
-            self.serial.baud = 115200
+            self.serial.baudrate = 115200
             self.serial.open()
         except Exception as err:
             error('Error opening/configuring the serial port for %s' % self.name)
@@ -32,25 +38,35 @@ class IMU(Device):
         self.sync()
         # Setup a Serial Listener
         self.serial_listener = SerialListener(self.serial, self.log)
-        self.serial_listener.addHandler(True, self.logMessages)
+        self.serial_listener.addHandler(True, self.handleMessages)
         self.serial_listener.listen()
+        # Initialize some variables
+        self.calibrated = None
     
     def sync(self):
         """Attempts to synchronize with the IMU"""
         # Send the Calibrate command to ensure that the IMU is calibrating
         sleep(0.5) # A short pause to let the uC catch up, not sure if this is necessary or not
         debug("IMU Calibrating")
+        self.calibrated = None
         self.serial.write('c')
+    
+    def handleMessages(self, message):
+        """Function for handling messages"""
+        # Try to log the message
+        self.logMessages(message)
+        
+        # If we care about the message handle it
+        if message[0] == 'R':
+            self.calibrated = message
+            info('IMU Calibrated: %s' % message)
     
     def logMessages(self, message):
         """Logs the messages to a file"""
-        print message
         try:
-            f = open("/home/william/orp/orpd/imu.txt", "rw")
-            f.write(message)
-            info(message)
+            if self.log_file != None:
+                self.log_file.write(message)
         except Exception as err:
-            print 'here in imu'
             error(err)
     
     def shutdown(self):

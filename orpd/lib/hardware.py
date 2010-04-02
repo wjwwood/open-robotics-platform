@@ -276,7 +276,6 @@ serial_listener.listen()
                     # Read until you get a delimiter
                     while token not in self.delimiters:
                         token = serial.read()
-			print token
                         message += token
                         self._listening_lock.acquire()
                         temp_listening = self._listening
