@@ -42,24 +42,40 @@ class IMU(Device):
         self.serial_listener.listen()
         # Initialize some variables
         self.calibrated = None
+        self.polling = False
     
     def sync(self):
         """Attempts to synchronize with the IMU"""
         # Send the Calibrate command to ensure that the IMU is calibrating
-        sleep(0.5) # A short pause to let the uC catch up, not sure if this is necessary or not
-        debug("IMU Calibrating")
-        self.calibrated = None
-        self.serial.write('c')
+        self.reset()
     
     def handleMessages(self, message):
         """Function for handling messages"""
         # Try to log the message
         self.logMessages(message)
         
-        # If we care about the message handle it
-        if message[0] == 'R':
+        message = message.strip()
+        if message == '':
+            return
+        
+        # Handle messages
+        if message[0] == 'R': # If the end of calibration
             self.calibrated = message
-            info('IMU Calibrated: %s' % message)
+            self.triggerEvent('calibrated', message)
+            debug('IMU Calibrated: %s' % message.strip())
+        elif 'Calibrating - Start' in message:
+            self.calibrated = None
+            debug("IMU Calibrating")
+        elif 'IMU Initialized!' in message:
+            debug("IMU Reset")
+        elif message[0] == 'p':
+            self.triggerEvent('angleReceived', message.split('\t')[9])
+        elif message[0] == 'g':
+            self.triggerEvent('angleReceived', message.split('\t')[3])
+        elif message[0] == 't' and message[1] == 'y':
+            self.triggerEvent('targetAngleReached', message)
+        else:
+            debug('Unhandled IMU message: %s' % message.strip())
     
     def logMessages(self, message):
         """Logs the messages to a file"""
@@ -80,50 +96,78 @@ class IMU(Device):
     
     def stop(self):
         """Called when Control Code Stops"""
-        pass
+        self.pollOff()
+    
+    @expose
+    def reset(self):
+        """Resets the IMU"""
+        self.serial.write('r')
     
     @expose
     def getAngle(self):
         """Polls the IMU for one angle, which will be returned in an event at a later point"""
-        pass
+        self.serial.write('g')
     
     @expose
     def pollOn(self):
         """Turns angle polling on if it isn't on already"""
-        self.serial.write('p')
+        if not self.polling:
+            self.polling = True
+            self.serial.write('p')
     
     @expose
     def pollOff(self):
         """Turns angle polling off if it isn't off already"""
-        pass
+        if self.polling:
+            self.polling = False
+            self.serial.write('p')
     
     @expose
     def pollToggle(self):
         """Toggles angle polling, if it is off it will turn on, vica versa"""
-        pass
+        self.polling = not self.polling
+        self.serial.write('p')
     
     @expose
     def zeroAngle(self):
         """Zeros the IMU"""
-        pass
+        self.serial.write('z')
     
     @expose
     def calibrate(self):
         """Calibrates the IMU, blocks until calibration is complete"""
-        pass
+        raise NotImplemented('Not Implemented, yet...')
     
     @expose
     def calibrateDeferred(self):
         """Calibrates the IMU, returns immediately and posts an event when complete"""
-        pass
+        self.serial.write('c')
     
     @expose
     def turnToAngle(self, destination_angle):
         """Instructs the IMU to turn to a specific angle, returns when the desired angle is reached"""
-        pass
+        raise NotImplemented('Not Implemented, yet...')
     
     @expose
-    def turnToAngleDeferred(self):
+    def turnToAngleDeferred(self, destination_angle):
         """Instructs the IMU to turn to a specific angle, returns immediately, and an event is generated when the target angle is reached"""
-        pass
+        command = 'ty'
+        if destination_angle >= 0:
+            command += '+'
+        else:
+            command += '-'
+        angle_str = str(destination_angle)
+        if len(angle_str) > 3:
+            command += angle_str[-3:]
+        elif len(angle_str) < 3:
+            while len(angle_str) != 3:
+                angle_str = '0'+angle_str
+        command += angle_str
+        self.zeroAngle()
+        debug(command)
+        # Seems like I'm sending the command too quickly
+        from time import sleep
+        for x in command:
+            self.serial.write(x)
+            sleep(0.3)
     
