@@ -128,7 +128,7 @@ class MultiLevelEventQueue(object):
                     except KeyError:
                         self.evts[self.priority_map['*']['*']].append(evt)
         else: 
-            log.debug("Event is being filtered.")
+            log.debug("The Event, %s, is being filtered" % str(evt.obj + '.' + evt.name))
     
     def __isValid(self, type):
         if not isinstance(type, (str, unicode)):
@@ -169,5 +169,5 @@ class MultiLevelEventQueue(object):
         for level in range(0, 10):
             if len(self.evts[level]):    
                 # remove the 0 index item, since the queue is FIFO
-                log.debug("Event triggered at priority %s" % level)
+                #log.debug("Event triggered at priority %s" % level)
                 return self.evts[level].pop(0)
