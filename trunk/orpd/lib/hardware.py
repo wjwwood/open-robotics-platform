@@ -72,7 +72,7 @@ class Device(object):
         if XMLRPCSERVER != None and XMLRPCSERVER.sandbox_running != None and XMLRPCSERVER.sandbox_running.value:
             XMLRPCSERVER.sandbox_queue.put(event)
         else:
-            self.log.debug("Event dropped. No running CC. Event: " + str(event))
+            self.log.debug("Event dropped because no CC handling events. Event \'%s\': %s" % (str(event[0]+'.'+event[1]), str(event[2]).strip()))
     
     def init(self):
         'Called when daemon starts'
